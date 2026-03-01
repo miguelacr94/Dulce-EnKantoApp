@@ -1,6 +1,6 @@
-import { supabase } from './supabase';
-import { Abono } from '../types';
-import { formatDateForDB } from '../utils/format';
+import { supabase } from '@/services';
+import { Abono } from '@/types';
+import { formatDateForDB } from '@/utils';
 
 export const abonosService = {
   // Obtener todos los abonos de un pedido

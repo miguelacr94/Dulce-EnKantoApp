@@ -55,20 +55,6 @@ export const getEstadoColor = (estado: string): string => {
   }
 };
 
-// Obtener color de fondo según estado del pedido
-export const getEstadoBackgroundColor = (estado: string): string => {
-  switch (estado) {
-    case 'pendiente':
-      return '#FFF8DC'; // Naranja muy claro
-    case 'entregado':
-      return '#F0FFF0'; // Verde muy claro
-    case 'cancelado':
-      return '#FFE4E1'; // Rojo muy claro
-    default:
-      return '#F5F5F5'; // Gris claro
-  }
-};
-
 // Validar teléfono colombiano
 export const validarTelefono = (telefono: string): boolean => {
   const telefonoRegex = /^3\d{9}$/;
@@ -98,6 +84,70 @@ export const diasHastaEntrega = (fechaEntrega: string): number => {
   return diffDays;
 };
 
+// Calcular horas de atraso (solo para pedidos vencidos) - ajustado a zona horaria local
+export const horasDeAtraso = (fechaEntrega: string): number => {
+  const now = new Date();
+  const entrega = new Date(fechaEntrega);
+  
+  // La fecha de entrega viene en UTC, pero new Date() la convierte automáticamente a local
+  // No necesitamos conversión manual, JavaScript ya maneja la zona horaria
+  
+  console.log(`Hora actual local: ${now.toISOString()}`);
+  console.log(`Fecha entrega UTC: ${entrega.toISOString()}`);
+  console.log(`Fecha entrega interpretada como local: ${new Date(fechaEntrega).toISOString()}`);
+  
+  // Si no está vencido, retornar 0
+  if (entrega >= now) return 0;
+  
+  const diffMs = now.getTime() - entrega.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  
+  console.log(`Diferencia en horas: ${diffHours}`);
+  
+  return diffHours;
+};
+
+// Obtener texto de horas de atraso
+export const getTextoHorasAtraso = (fechaEntrega: string): string => {
+  const horas = horasDeAtraso(fechaEntrega);
+  
+  if (horas === 0) return '';
+  
+  if (horas < 24) {
+    return `RETRASO ${horas} hora${horas !== 1 ? 's' : ''}`;
+  } else {
+    const dias = Math.floor(horas / 24);
+    const horasRestantes = horas % 24;
+    
+    if (horasRestantes === 0) {
+      return `RETRASO ${dias} día${dias !== 1 ? 's' : ''}`;
+    } else {
+      return `RETRASO ${dias} día${dias !== 1 ? 's' : ''} y ${horasRestantes}h`;
+    }
+  }
+};
+
+// Verificar si un pedido está vencido - ajustado a zona horaria local
+export const estaVencido = (fechaEntrega: string): boolean => {
+  const now = new Date();
+  const entrega = new Date(fechaEntrega);
+  
+  // JavaScript convierte automáticamente UTC a local
+  return entrega < now;
+};
+
+// Convertir fecha UTC a hora local formateada
+export const getHoraLocal = (fechaUTC: string): string => {
+  const fecha = new Date(fechaUTC);
+  
+  // JavaScript ya convierte UTC a local automáticamente
+  return fecha.toLocaleTimeString('es-CO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 // Obtener texto de días restantes
 export const getTextoDiasRestantes = (fechaEntrega: string): string => {
   const dias = diasHastaEntrega(fechaEntrega);
@@ -115,17 +165,6 @@ export const getTextoDiasRestantes = (fechaEntrega: string): string => {
   }
 };
 
-// Generar ID único temporal (mientras no tengamos UUID del backend)
-export const generateTempId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
-
-// Validar email
-export const validarEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
 // Formatear fecha para base de datos (YYYY-MM-DD)
 export const formatDateForDB = (date: string | Date): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -138,34 +177,6 @@ export const formatDateTimeForDB = (date: string | Date): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(dateObj.getTime())) return new Date().toISOString();
   return dateObj.toISOString();
-};
-
-// Truncar texto
-export const truncarTexto = (texto: string, maxLength: number): string => {
-  if (texto.length <= maxLength) return texto;
-  return texto.substring(0, maxLength) + '...';
-};
-
-// Formatear descripción del producto según tipo y cantidad/peso
-export const formatProductoDescripcion = (
-  tipo: string,
-  cantidad: number,
-  label?: string
-): string => {
-  switch (tipo) {
-    case 'torta':
-      return `${label || `${cantidad} libra${cantidad !== 1 ? 's' : ''}`}`;
-    case 'cupcake':
-      return `${cantidad} unidad${cantidad !== 1 ? 'es' : ''}`;
-    case 'combo':
-      return label || `Combo para ${cantidad} personas`;
-    case 'galletas':
-      return `${cantidad} unidad${cantidad !== 1 ? 'es' : ''}`;
-    case 'postres':
-      return `${cantidad} unidad${cantidad !== 1 ? 'es' : ''}`;
-    default:
-      return `${cantidad} unidad${cantidad !== 1 ? 'es' : ''}`;
-  }
 };
 
 // Obtener etiqueta de peso/cantidad según tipo de producto

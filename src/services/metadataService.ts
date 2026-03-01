@@ -1,23 +1,32 @@
-import { supabase } from './supabase';
-import { Producto, Sabor, Tamano } from '../types';
+import { supabase } from '@/services';
+import { Producto, Sabor, Tamano } from '@/types';
 
 export const metadataService = {
   // --- PRODUCTOS ---
   async getProductos(): Promise<Producto[]> {
-    const { data, error } = await supabase
-      .from('productos')
-      .select('id, nombre, tipo_producto, precio, descripcion, tipo_medida, created_at')
-      .order('nombre', { ascending: true });
+    try {
+      console.log('=== OBTENIENDO PRODUCTOS ===');
+      const { data, error } = await supabase
+        .from('productos')
+        .select('id, nombre, descripcion, tipo_medida, created_at')
+        .order('nombre', { ascending: true });
 
-    if (error) throw error;
-    
-    const productos = data || [];
-    console.log('=== PRODUCTOS CARGADOS ===');
-    productos.forEach(p => {
-      console.log(`- ${p.nombre}: tipo_medida = ${p.tipo_medida || 'NO DEFINIDO'}`);
-    });
-    
-    return productos;
+      if (error) {
+        console.error('Error en consulta de productos:', error);
+        throw error;
+      }
+      
+      const productos = data || [];
+      console.log(`=== ${productos.length} PRODUCTOS CARGADOS ===`);
+      productos.forEach(p => {
+        console.log(`- ${p.nombre}: ${p.descripcion || 'Sin descripción'} (${p.tipo_medida || 'sin tipo'})`);
+      });
+      
+      return productos;
+    } catch (error) {
+      console.error('Error completo en getProductos:', error);
+      throw error;
+    }
   },
 
   async createProducto(producto: Omit<Producto, 'id' | 'created_at'>): Promise<Producto> {

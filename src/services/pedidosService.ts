@@ -1,6 +1,6 @@
-import { supabase } from "./supabase";
-import { Pedido, PedidoConDetalles, EstadoPedido, PedidoItem } from "../types";
-import { formatDateForDB } from "../utils/format";
+import { supabase } from '@/services';
+import { Pedido, PedidoConDetalles, EstadoPedido, PedidoItem } from '@/types';
+import { formatDateTimeForDB } from '@/utils';
 
 export const pedidosService = {
   // Obtener todos los pedidos con detalles del cliente
@@ -156,7 +156,7 @@ export const pedidosService = {
     const pedidoConFormato = {
       ...pedido,
       estado: "pendiente" as EstadoPedido,
-      fecha_entrega: formatDateForDB(pedido.fecha_entrega),
+      fecha_entrega: formatDateTimeForDB(pedido.fecha_entrega),
     };
 
     const { data: nuevoPedido, error: errorPedido } = await supabase
@@ -189,7 +189,7 @@ export const pedidosService = {
   async updatePedido(id: string, pedido: Partial<Pedido>, items?: Omit<PedidoItem, 'id' | 'pedido_id'>[]): Promise<Pedido> {
     const pedidoUpdates = { ...pedido };
     if (pedidoUpdates.fecha_entrega) {
-      pedidoUpdates.fecha_entrega = formatDateForDB(
+      pedidoUpdates.fecha_entrega = formatDateTimeForDB(
         pedidoUpdates.fecha_entrega,
       );
     }
