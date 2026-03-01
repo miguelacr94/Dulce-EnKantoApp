@@ -9,8 +9,6 @@ export interface Cliente {
 export interface Producto {
   id: string;
   nombre: string;
-  tipo_producto?: TipoProducto;
-  precio?: number;
   descripcion?: string;
   tipo_medida?: 'peso' | 'tamano';
   created_at?: string;
@@ -49,18 +47,18 @@ export interface Pedido {
   id: string;
   cliente_nombre: string;
   cliente_telefono: string;
-  tipo_producto: TipoProducto;
-  peso: number | string;
-  cantidad: number;
+  tipo_producto: 'torta' | 'cupcake';
+  peso: number;
   sabor: string;
   descripcion: string;
   precio_total: number;
-  precio_domicilio: number;
-  es_domicilio: boolean;
-  direccion_envio?: string;
-  estado: EstadoPedido;
+  estado: 'pendiente' | 'entregado' | 'cancelado';
   fecha_entrega: string;
   created_at: string;
+  cantidad: number;
+  es_domicilio: boolean;
+  precio_domicilio: number;
+  direccion_envio?: string;
   cliente?: Cliente;
   abonos?: Abono[];
   items?: PedidoItem[];
@@ -80,4 +78,4 @@ export interface PedidoConDetalles extends Pedido {
 }
 
 export type EstadoPedido = 'pendiente' | 'entregado' | 'cancelado';
-export type TipoProducto = 'torta' | 'cupcake' | 'combo' | 'galletas' | 'postres';
+export type TipoProducto = 'torta' | 'cupcake';
