@@ -11,15 +11,19 @@ Aplicación móvil para gestionar pedidos de repostería (tortas y cupcakes) con
 - ✅ Filtros por estado de pedidos
 - ✅ Dashboard con estadísticas en tiempo real
 - ✅ Diseño con colores pastel para repostería
+- ✅ Prevención de doble registro
+- ✅ Gestión de productos (sabores y tamaños)
+- ✅ Modal optimizado con soporte de teclado
 
 ## 🛠️ Tecnologías
 
 - **Frontend**: React Native con Expo
 - **Backend**: Supabase (Base de datos y API)
-- **Estado**: Zustand
-- **Consultas**: React Query
+- **Estado**: Zustand + React Query
+- **Arquitectura**: Feature-based con Repository Pattern
 - **Navegación**: React Navigation
 - **Lenguaje**: TypeScript
+- **Debounce**: Utilidad personalizada para prevención de ejecuciones múltiples
 
 ## 📋 Requisitos Previos
 
@@ -42,62 +46,13 @@ npm start
 ### 2. Configurar Supabase
 
 1. Ve a [supabase.com](https://supabase.com) y crea un nuevo proyecto
-2. Ejecuta el siguiente SQL en el editor SQL de Supabase:
-
-```sql
--- Crear tabla de clientes
-CREATE TABLE clientes (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  nombre TEXT NOT NULL,
-  telefono TEXT NOT NULL,
-  direccion TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Crear tabla de pedidos
-CREATE TABLE pedidos (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  cliente_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
-  tipo_producto TEXT NOT NULL CHECK (tipo_producto IN ('torta', 'cupcake')),
-  peso NUMERIC NOT NULL CHECK (peso > 0),
-  sabor TEXT NOT NULL,
-  descripcion TEXT,
-  precio_total NUMERIC NOT NULL CHECK (precio_total > 0),
-  estado TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'entregado', 'cancelado')),
-  fecha_entrega DATE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Crear tabla de abonos
-CREATE TABLE abonos (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  pedido_id UUID REFERENCES pedidos(id) ON DELETE CASCADE,
-  monto NUMERIC NOT NULL CHECK (monto > 0),
-  fecha DATE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Crear índices para mejor rendimiento
-CREATE INDEX idx_pedidos_fecha_entrega ON pedidos(fecha_entrega);
-CREATE INDEX idx_pedidos_cliente_id ON pedidos(cliente_id);
-CREATE INDEX idx_abonos_pedido_id ON abonos(pedido_id);
-
--- Habilitar RLS (Row Level Security)
-ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE abonos ENABLE ROW LEVEL SECURITY;
-
--- Políticas de RLS (permitir todo para esta app simple)
-CREATE POLICY "Allow all operations on clientes" ON clientes FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all operations on pedidos" ON pedidos FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all operations on abonos" ON abonos FOR ALL USING (true) WITH CHECK (true);
-```
+2. Ejecuta el archivo SQL proporcionado en `supabase-setup.sql`
 
 ### 3. Configurar las credenciales de Supabase
 
 1. Ve a la configuración de tu proyecto Supabase
 2. Copia la URL y la Anonymous Key
-3. Abre el archivo `src/services/supabase.ts`
+3. Abre el archivo `src/app/core/database/supabase.ts`
 4. Reemplaza los valores:
 
 ```typescript
@@ -122,36 +77,63 @@ npm run ios
 
 ```
 src/
-├── components/          # Componentes reutilizables
-├── screens/            # Pantallas de la aplicación
-│   ├── DashboardScreen.tsx
-│   ├── ClientesScreen.tsx
-│   ├── PedidosScreen.tsx
-│   ├── CrearPedidoScreen.tsx
-│   ├── PedidoDetalleScreen.tsx
-│   ├── ClienteDetalleScreen.tsx
-│   └── CrearClienteScreen.tsx
-├── services/          # Servicios de API
-│   ├── supabase.ts
-│   ├── clientesService.ts
-│   ├── pedidosService.ts
-│   └── abonosService.ts
-├── navigation/         # Configuración de navegación
-│   └── AppNavigator.tsx
-├── store/             # Manejo de estado con Zustand
-│   └── appStore.ts
-├── hooks/             # Hooks personalizados
-│   ├── useClientes.ts
-│   ├── usePedidos.ts
-│   └── useAbonos.ts
-├── providers/         # Providers de React
-│   └── QueryProvider.tsx
-├── utils/             # Utilidades y constantes
-│   ├── constants.ts
-│   └── format.ts
-└── types/             # Tipos de TypeScript
-    └── index.ts
+├── app/                    # Configuración principal de la app
+│   ├── core/              # Configuración centralizada
+│   │   ├── database/      # Configuración de Supabase
+│   │   ├── errors/       # Manejo de errores
+│   │   ├── logging/      # Sistema de logging
+│   │   └── validation/    # Esquemas de validación
+│   ├── navigation/        # Configuración de navegación
+│   └── store/           # Estado global con Zustand
+├── features/             # Módulos por funcionalidad
+│   ├── pedidos/          # Gestión de pedidos
+│   │   ├── api/          # Repository y servicios
+│   │   ├── components/   # Componentes específicos
+│   │   ├── hooks/        # Hooks personalizados
+│   │   ├── screens/      # Pantallas
+│   │   └── types/        # Tipos de datos
+│   ├── productos/        # Gestión de productos
+│   │   ├── api/          # Repository de productos
+│   │   ├── hooks/        # Hooks de productos
+│   │   ├── screens/      # Pantallas de gestión
+│   │   └── types/        # Tipos de productos
+│   └── configuracion/    # Configuración de la app
+│       └── screens/      # Pantallas de configuración
+├── shared/               # Componentes y utilidades compartidas
+│   ├── components/       # UI reutilizable
+│   │   └── ui/          # Componentes genéricos
+│   └── hooks/           # Hooks compartidos
+├── utils/                # Utilidades generales
+│   ├── debounce.ts      # Utilidad de debounce
+│   ├── format.ts        # Funciones de formato
+│   └── index.ts         # Exportaciones
+├── providers/            # Providers de React
+│   └── QueryProvider.tsx # Configuración de React Query
+└── types/               # Tipos globales
+    └── index.ts         # Exportaciones de tipos
 ```
+
+## 🏛️ Arquitectura
+
+### Feature-Based Architecture
+El proyecto está organizado por características (features) para mejor mantenibilidad:
+
+- **Pedidos**: Gestión completa de pedidos con su propia API, componentes y hooks
+- **Productos**: Administración de productos, sabores y tamaños
+- **Configuración**: Settings y preferencias de la aplicación
+
+### Repository Pattern
+Cada feature tiene su propio repository para separar la lógica de negocio:
+
+```typescript
+// Ejemplo de uso
+const { createPedido, isCreating } = usePedidos();
+```
+
+### Estado Global
+- **Zustand**: Para estado global simple
+- **React Query**: Para caché y estado del servidor
+- **Hooks personalizados**: Para lógica reutilizable
 
 ## 🎨 Diseño y UI
 
@@ -159,6 +141,7 @@ src/
 - **Estados**: Indicadores visuales claros para pendiente/entregado/cancelado
 - **Tipografía**: Jerarquía clara con diferentes tamaños de fuente
 - **Sombras**: Efectos de sombra sutiles para dar profundidad
+- **Modales optimizados**: Con KeyboardAvoidingView para mejor UX
 
 ## 🔧 Funcionalidades Principales
 
@@ -166,25 +149,25 @@ src/
 - Resumen de pedidos por estado
 - Total de dinero pendiente por cobrar
 - Lista de próximos pedidos a entregar
-- Acciones rápidas para crear pedidos y clientes
-
-### Gestión de Clientes
-- Crear, editar y eliminar clientes
-- Validación de teléfono colombiano
-- Historial completo de pedidos por cliente
-- Estadísticas de consumo
+- Acciones rápidas para crear pedidos
 
 ### Gestión de Pedidos
-- Crear pedidos con abono inicial
-- Filtros por estado (pendiente/entregado/cancelado)
-- Búsqueda por cliente, sabor o descripción
+- Crear pedidos con múltiples items
+- Sistema de abonos parciales
+- **Prevención de doble registro** con debounce
+- Filtros y búsqueda avanzada
 - Cambio de estado con validaciones
 
-### Sistema de Abonos
-- Agregar abonos parciales a pedidos
-- Validación que los abonos no superen el precio total
-- Cálculo automático de saldo pendiente
-- Historial completo de abonos por pedido
+### Gestión de Productos
+- Administración de productos
+- Gestión de sabores por producto
+- Configuración de tamaños (por peso o unidad)
+- Validaciones específicas por tipo
+
+### Mejoras UX
+- **Modal optimizado**: Los campos permanecen visibles sobre el teclado
+- **Cards mejoradas**: Orden lógico (abono arriba, restante abajo)
+- **Navegación fluida**: Sin bloqueos por doble registro
 
 ## 🚀 Despliegue
 
@@ -202,12 +185,15 @@ expo build:android
 expo build:ios
 ```
 
-## 📝 Notas Importantes
+## 📝 Mejoras Recientes
 
-1. **Seguridad**: Esta app usa la anonymous key de Supabase. Para producción considera implementar autenticación.
-2. **RLS**: Las políticas de Row Level Security están configuradas para permitir todo. Ajusta según tus necesidades.
-3. **Validaciones**: La app incluye validaciones frontend pero considera agregar validaciones backend adicionales.
-4. **Offline**: Actualmente la app requiere conexión a internet. Considera agregar soporte offline con AsyncStorage.
+### v1.1.0 - Optimización y Prevención de Errores
+- ✅ Sistema de prevención de doble registro
+- ✅ Modal de items con KeyboardAvoidingView
+- ✅ Nueva arquitectura feature-based
+- ✅ Repository pattern implementado
+- ✅ BundleIdentifier configurado para iOS
+- ✅ Utilidad debounce para prevención de ejecuciones múltiples
 
 ## 🐛 Solución de Problemas
 
@@ -215,6 +201,8 @@ expo build:ios
 1. **Error de conexión**: Verifica que las credenciales de Supabase sean correctas
 2. **Error de RLS**: Asegúrate de que las políticas de Row Level Security estén configuradas
 3. **Error de tipos**: Ejecuta `npm install --save-dev @types/react @types/react-native` si tienes errores de TypeScript
+4. **Doble registro**: El sistema ahora previene registros duplicados automáticamente
+5. **Teclado oculta campos**: Los modales ahora ajustan automáticamente el layout
 
 ## 🤝 Contribuciones
 
@@ -227,4 +215,3 @@ expo build:ios
 ## 📄 Licencia
 
 Este proyecto está bajo la Licencia MIT.
-# Dulce-EnKantoApp
