@@ -38,6 +38,7 @@ const GestionSaboresScreen: React.FC = () => {
             <FlatList
                 data={sabores}
                 keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
                     <View style={styles.item}>
                         <Text style={styles.itemText}>{item.nombre}</Text>

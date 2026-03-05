@@ -32,6 +32,7 @@ const GestionTamanosScreen: React.FC = () => {
             <FlatList
                 data={tamanos}
                 keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
                     <View style={styles.item}>
                         <View>

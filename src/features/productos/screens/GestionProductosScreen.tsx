@@ -86,7 +86,7 @@ const GestionProductosScreen: React.FC = () => {
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>{editingProducto ? 'Editar Producto' : 'Nuevo Producto'}</Text>
 
-                        <ScrollView>
+                        <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.label}>Nombre *</Text>
                             <TextInput style={styles.input} value={formData.nombre} onChangeText={t => setFormData({ ...formData, nombre: t })} />
 

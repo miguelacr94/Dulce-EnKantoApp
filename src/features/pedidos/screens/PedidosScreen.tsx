@@ -86,6 +86,7 @@ const PedidosScreen: React.FC = () => {
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={refetch} />
         }
+        showsVerticalScrollIndicator={false}
       >
         {pedidosFiltrados.length > 0 ? (
           pedidosFiltrados.map((pedido) => (

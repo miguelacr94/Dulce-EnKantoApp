@@ -36,7 +36,7 @@ export const ItemsList: React.FC<ItemsListProps> = ({
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.itemsContainer}>
+      <ScrollView style={styles.itemsContainer} showsVerticalScrollIndicator={false}>
         {items.map((item, index) => {
           const { product, sabor, relleno } = getItemInfo(item);
           return (

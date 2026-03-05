@@ -331,7 +331,7 @@ const EditarPedidoScreen: React.FC = () => {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.formContainer}>
           <Text style={styles.title}>Editar Pedido</Text>
 

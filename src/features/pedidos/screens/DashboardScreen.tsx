@@ -61,15 +61,15 @@ const DashboardScreen: React.FC = () => {
 );
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Dulce Enkanto</Text>
-        <Text style={styles.subtitle}>Panel de Control</Text>
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView} 
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Dulce Enkanto</Text>
+          <Text style={styles.subtitle}>Panel de Control</Text>
       </View>
 
       {/* Estadísticas */}
@@ -116,19 +116,16 @@ const DashboardScreen: React.FC = () => {
           </View>
         )}
       </View>
-
-      {/* Acciones rápidas */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: COLORS.primary }]}
-          onPress={() => navigation.navigate('CrearPedido')}
-        >
-          <Text style={styles.actionButtonText}>Nuevo Pedido</Text>
-        </TouchableOpacity>
-
-       
-      </View>
     </ScrollView>
+
+    {/* Botón flotante para nuevo pedido */}
+    <TouchableOpacity
+      style={styles.fab}
+      onPress={() => navigation.navigate('CrearPedido')}
+    >
+      <Text style={styles.fabText}>+</Text>
+    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -136,6 +133,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
     padding: SPACING.lg,
@@ -218,6 +218,23 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: FONTS.medium,
+    fontWeight: 'bold',
+    color: COLORS.textWhite,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: SPACING.xl,
+    right: SPACING.md,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.large,
+  },
+  fabText: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.textWhite,
   },

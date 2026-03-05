@@ -14,13 +14,16 @@ const PedidoFooter: React.FC<PedidoFooterProps> = ({ pedido, vencido }) => {
       <View style={styles.fechaContainer}>
         <Text style={[
           styles.fechaEntrega,
-          vencido ? styles.fechaVencida : styles.textoVencido
+          vencido && pedido.estado !== 'entregado' ? styles.fechaVencida : pedido.estado === 'entregado' ? styles.fechaEntregada : styles.textoVencido
         ]}>
-          {getTextoDiasRestantes(pedido.fecha_entrega)}
+          {pedido.estado === 'entregado' 
+            ? getTextoDiasRestantes(pedido.fecha_entrega).replace('Vencido', 'Entregado')
+            : getTextoDiasRestantes(pedido.fecha_entrega)
+          }
         </Text>
         <Text style={[
           styles.horaEntrega,
-          vencido && styles.textoVencido
+          vencido && pedido.estado !== 'entregado' && styles.textoVencido
         ]}>
           {formatTime(pedido.fecha_entrega)}
         </Text>
@@ -74,6 +77,10 @@ const styles = StyleSheet.create({
   fechaVencida: {
     color: '#FF4444', // Rojo para fechas vencidas
     fontWeight: '600',
+  },
+  fechaEntregada: {
+    color: COLORS.success, // Verde para pedidos entregados
+    fontWeight: '500',
   },
 });
 

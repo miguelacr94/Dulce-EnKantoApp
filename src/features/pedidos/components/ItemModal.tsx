@@ -354,20 +354,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xl, // Espacio extra para el teclado
   },
   keyboardAvoidingView: {
     width: '100%',
-    maxHeight: '85%',
+    maxWidth: 500, // Ancho máximo para pantallas grandes
+    justifyContent: 'center',
   },
   modalContent: {
     backgroundColor: COLORS.cardBackground,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     width: '100%',
-    maxHeight: '85%',
+    maxHeight: '90%', // Reducido para evitar que se salga
+    minHeight: '60%', // Ajustado para mantener proporción
   },
   scrollView: {
-    maxHeight: 400,
+    maxHeight: 350, // Reducido para asegurar que quepa
+    flexGrow: 0,
   },
   modalTitle: {
     fontSize: 18,

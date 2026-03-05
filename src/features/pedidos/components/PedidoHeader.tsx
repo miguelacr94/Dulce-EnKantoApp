@@ -35,6 +35,35 @@ const PedidoHeader: React.FC<PedidoHeaderProps> = ({ pedido, vencido }) => {
         ]}>
           {pedido.cliente_telefono || 'Sin teléfono'}
         </Text>
+        
+        {/* Indicador de domicilio */}
+        <View style={styles.domicilioRow}>
+          <View style={[
+            styles.domicilioBadge,
+            { backgroundColor: pedido.es_domicilio ? COLORS.success + '20' : COLORS.textMuted + '20' }
+          ]}>
+            <Text style={[
+              styles.domicilioText,
+              { color: pedido.es_domicilio ? COLORS.success : COLORS.textMuted }
+            ]}>
+              {pedido.es_domicilio ? '🏠' : '🏪'}
+            </Text>
+          </View>
+          <Text style={[
+            styles.domicilioLabel,
+            vencido && styles.textoVencido
+          ]}>
+            {pedido.es_domicilio ? 'Domicilio' : 'Casa'}
+          </Text>
+          {pedido.es_domicilio && pedido.precio_domicilio > 0 && (
+            <Text style={[
+              styles.domicilioCosto,
+              vencido && styles.textoVencido
+            ]}>
+              (+{formatCurrency(pedido.precio_domicilio)})
+            </Text>
+          )}
+        </View>
       </View>
       <View style={styles.precioContainer}>
         <Text style={[
@@ -59,7 +88,7 @@ const PedidoHeader: React.FC<PedidoHeaderProps> = ({ pedido, vencido }) => {
             Restante: {formatCurrency(pedido.saldo_pendiente)}
           </Text>
         )}
-        {vencido && textoAtraso && (
+        {vencido && textoAtraso && pedido.estado !== 'entregado' && (
           <Text style={styles.textoAtraso}>
             {textoAtraso}
           </Text>
@@ -88,6 +117,32 @@ const styles = StyleSheet.create({
   clienteTelefono: {
     fontSize: FONTS.small,
     color: COLORS.textLight,
+    marginBottom: SPACING.xs,
+  },
+  domicilioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  domicilioBadge: {
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: SPACING.xs,
+  },
+  domicilioText: {
+    fontSize: FONTS.small,
+    fontWeight: 'bold',
+  },
+  domicilioLabel: {
+    fontSize: FONTS.small,
+    color: COLORS.textLight,
+    fontWeight: '500',
+  },
+  domicilioCosto: {
+    fontSize: FONTS.small,
+    color: COLORS.textMuted,
+    marginLeft: SPACING.xs,
   },
   precioContainer: {
     alignItems: 'flex-end',

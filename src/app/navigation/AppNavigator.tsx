@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { Text } from 'react-native';
 
 // Importar pantallas desde features (Arquitectura SOLID)
 import { DashboardScreen, PedidosScreen, CrearPedidoScreen, PedidoDetalleScreen, EditarPedidoScreen } from '@/features/pedidos/screens';
@@ -35,6 +36,19 @@ export type NavigationParamList = RootStackParamList & TabParamList;
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
+// Componentes de iconos para las tabs
+const HomeIcon = ({ color, size }: { color: string; size: number }) => (
+  <Text style={{ color, fontSize: size }}>🏠</Text>
+);
+
+const PedidosIcon = ({ color, size }: { color: string; size: number }) => (
+  <Text style={{ color, fontSize: size }}>📋</Text>
+);
+
+const ConfigIcon = ({ color, size }: { color: string; size: number }) => (
+  <Text style={{ color, fontSize: size }}>⚙️</Text>
+);
+
 // Componente para las tabs principales
 const MainTabs = () => {
   return (
@@ -61,7 +75,7 @@ const MainTabs = () => {
         component={DashboardScreen}
         options={{
           tabBarLabel: 'Inicio',
-          tabBarIcon: () => null,
+          tabBarIcon: HomeIcon,
         }}
       />
       <Tab.Screen
@@ -69,7 +83,7 @@ const MainTabs = () => {
         component={PedidosScreen}
         options={{
           tabBarLabel: 'Pedidos',
-          tabBarIcon: () => null,
+          tabBarIcon: PedidosIcon,
         }}
       />
       <Tab.Screen
@@ -77,8 +91,7 @@ const MainTabs = () => {
         component={ConfiguracionScreen}
         options={{
           tabBarLabel: 'Config',
-          tabBarIcon: () => null,
-          title: 'Configuracion',
+          tabBarIcon: ConfigIcon,
         }}
       />
     </Tab.Navigator>

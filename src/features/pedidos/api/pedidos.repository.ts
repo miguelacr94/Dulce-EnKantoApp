@@ -77,13 +77,14 @@ export class PedidosRepository implements IPedidosRepository {
   }
 
   /**
-   * Obtener todos los pedidos con detalles
+   * Obtener todos los pedidos con detalles (últimos 20)
    */
   async getAll(): Promise<PedidoConDetalles[]> {
     const { data, error } = await supabase
       .from(this.tableName)
       .select(this.fullQuery)
-      .order('fecha_entrega', { ascending: true });
+      .order('created_at', { ascending: false }) // Más recientes primero
+      .limit(20); // Limitar a 20 pedidos
 
     if (error) {
       throw new PedidoRepositoryError('Error al cargar pedidos', error);
