@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pedidosService } from '@/services';
 import { useAppStore } from '@/app/store/appStore';
+import { useEffect } from 'react';
 import { Pedido, PedidoConDetalles, EstadoPedido, PedidoItem } from '@/features/pedidos/types';
+import { notificationService } from '@/app/core/notifications';
 
 export const usePedidos = () => {
   const queryClient = useQueryClient();
@@ -27,6 +29,13 @@ export const usePedidos = () => {
     queryKey: ['estadisticas'],
     queryFn: pedidosService.getEstadisticas
   });
+  
+  // Actualizar badge del icono de la app cuando cambian las estadísticas
+  useEffect(() => {
+    if (estadisticas?.pendientes !== undefined) {
+      notificationService.setBadgeCount(estadisticas.pendientes);
+    }
+  }, [estadisticas?.pendientes]);
 
   // Mutation para crear pedido
   const createPedidoMutation = useMutation({

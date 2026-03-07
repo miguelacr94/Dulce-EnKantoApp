@@ -17,6 +17,7 @@ export interface Producto {
 export interface Sabor {
   id: string;
   nombre: string;
+  tipo: 'Sabor' | 'Relleno' | 'Todos';
   created_at?: string;
 }
 

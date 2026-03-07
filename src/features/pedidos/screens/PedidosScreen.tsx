@@ -31,16 +31,21 @@ const PedidosScreen: React.FC = () => {
   // Filtrar pedidos según el estado y búsqueda
   const pedidosFiltrados = pedidos.filter(pedido => {
     const coincideEstado = filtro === 'todos' || pedido.estado === filtro;
-    const coincideBusqueda = busqueda === '' || 
+    const coincideBusqueda = busqueda === '' ||
       (pedido.cliente_nombre && pedido.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase())) ||
       pedido.sabor.toLowerCase().includes(busqueda.toLowerCase()) ||
       pedido.descripcion.toLowerCase().includes(busqueda.toLowerCase());
-    
+
     return coincideEstado && coincideBusqueda;
   });
 
 
   console.log('pedidosFiltrados', pedidosFiltrados);
+
+  const getCount = (estado: EstadoPedido | 'todos') => {
+    if (estado === 'todos') return pedidos.length;
+    return pedidos.filter(p => p.estado === estado).length;
+  };
 
   const renderFiltroButton = (estado: EstadoPedido | 'todos', label: string) => (
     <TouchableOpacity
@@ -55,7 +60,7 @@ const PedidosScreen: React.FC = () => {
         styles.filtroButtonText,
         filtro === estado && styles.filtroButtonTextActive
       ]}>
-        {label}
+        {label} ({getCount(estado)})
       </Text>
     </TouchableOpacity>
   );
@@ -74,10 +79,12 @@ const PedidosScreen: React.FC = () => {
 
       {/* Filtros de estado */}
       <View style={styles.filtrosContainer}>
-        {renderFiltroButton('todos', 'Todos')}
-        {renderFiltroButton('pendiente', 'Pendientes')}
-        {renderFiltroButton('entregado', 'Entregados')}
-        {renderFiltroButton('cancelado', 'Cancelados')}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {renderFiltroButton('todos', 'Todos')}
+          {renderFiltroButton('pendiente', 'Pendientes')}
+          {renderFiltroButton('entregado', 'Entregados')}
+          {renderFiltroButton('cancelado', 'Cancelados')}
+        </ScrollView>
       </View>
 
       {/* Lista de pedidos */}

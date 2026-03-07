@@ -5,7 +5,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Text } from 'react-native';
 
 // Importar pantallas desde features (Arquitectura SOLID)
-import { DashboardScreen, PedidosScreen, CrearPedidoScreen, PedidoDetalleScreen, EditarPedidoScreen } from '@/features/pedidos/screens';
+import { DashboardScreen, PedidosScreen, CrearPedidoScreen, PedidoDetalleScreen, EditarPedidoScreen, AddItemScreen } from '@/features/pedidos/screens';
+import { CrearPedidoItemDTO } from '@/features/pedidos/types';
 
 
 import { ConfiguracionScreen } from '@/features/configuracion/screens';
@@ -16,12 +17,13 @@ import { GestionProductosScreen, GestionSaboresScreen, GestionTamanosScreen } fr
 export type RootStackParamList = {
   MainTabs: undefined;
   PedidoDetalle: { pedidoId: string };
-  CrearPedido: undefined;
-  EditarPedido: { pedidoId: string };
+  CrearPedido: { newItem?: CrearPedidoItemDTO; editingIndex?: number } | undefined;
+  EditarPedido: { pedidoId: string; newItem?: CrearPedidoItemDTO; editingIndex?: number };
   Configuracion: undefined;
   GestionProductos: undefined;
   GestionSabores: undefined;
   GestionTamanos: undefined;
+  AddItem: { initialItem?: CrearPedidoItemDTO; editingIndex?: number; returnTo: 'CrearPedido' | 'EditarPedido'; pedidoId?: string };
 };
 
 export type TabParamList = {
@@ -148,6 +150,11 @@ const AppNavigator = () => {
           name="GestionTamanos"
           component={GestionTamanosScreen}
           options={{ title: 'Gestionar Tamaños' }}
+        />
+        <Stack.Screen
+          name="AddItem"
+          component={AddItemScreen}
+          options={{ title: 'Agregar Item' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

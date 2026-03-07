@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
-import { PedidoItem, Producto, Sabor, Tamano } from '@/types';
+import { Producto, Sabor, Tamano } from '@/types';
 import { CrearPedidoItemDTO } from '@/features/pedidos/types';
 import { metadataService } from '@/services';
-import { formatDateForDB, formatDateTimeForDB } from '@/utils';
+import { formatDateTimeForDB } from '@/utils';
 
 export const usePedidoForm = () => {
   // Estado del pedido (cabecera y carrito)
@@ -18,7 +18,7 @@ export const usePedidoForm = () => {
   const [abonoInicial, setAbonoInicial] = useState(0);
   const [descripcion, setDescripcion] = useState('');
 
-  // Estado para el modal de agregar item
+  // Estados que aún podrían necesitarse para la transición o por otros componentes
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [tempItem, setTempItem] = useState<CrearPedidoItemDTO>({
@@ -49,15 +49,10 @@ export const usePedidoForm = () => {
 
   const loadFilteredOptions = async (productoId: string) => {
     try {
-      console.log(`Cargando opciones para producto: ${productoId}`);
-      
       const [fSabores, fTamanos] = await Promise.all([
         metadataService.getSaboresPorProducto(productoId),
         metadataService.getTamanosPorProducto(productoId),
       ]);
-
-      console.log(`Sabores encontrados: ${fSabores.length}`);
-      console.log(`Tamaños encontrados: ${fTamanos.length}`, fTamanos);
 
       setFilteredOptions({
         sabores: fSabores.length > 0 ? fSabores : [],
@@ -72,48 +67,6 @@ export const usePedidoForm = () => {
     }
   };
 
-  const validateItem = () => {
-    if (!tempItem.producto_id) return 'Selecciona un producto';
-    if (tempItem.cantidad <= 0) return 'La cantidad debe ser mayor a 0';
-    if (tempItem.precio_unitario < 0) return 'El precio no puede ser negativo';
-    return null;
-  };
-
-  const handleAddItem = () => {
-    const error = validateItem();
-    if (error) {
-      Alert.alert('Error', error);
-      return;
-    }
-
-    if (editingItemIndex !== null) {
-      const newItems = [...items];
-      newItems[editingItemIndex] = tempItem;
-      setItems(newItems);
-    } else {
-      setItems([...items, tempItem]);
-    }
-
-    setShowItemModal(false);
-    setEditingItemIndex(null);
-    setTempItem({
-      producto_id: '',
-      sabor_id: null,
-      relleno_id: null,
-      tamano_id: null,
-      cantidad: 1,
-      precio_unitario: 0,
-    });
-  };
-
-  const handleEditItem = (index: number) => {
-    const item = items[index];
-    setTempItem(item);
-    setEditingItemIndex(index);
-    loadFilteredOptions(item.producto_id);
-    setShowItemModal(true);
-  };
-
   const handleRemoveItem = (index: number) => {
     const newItems = items.filter((_, i) => i !== index);
     setItems(newItems);
@@ -122,7 +75,6 @@ export const usePedidoForm = () => {
   const handleDescripcionChange = (text: string) => {
     setDescripcion(text);
 
-    // Calcular la altura necesaria basada en el contenido
     const lineHeight = 20;
     const minLines = 3;
     const maxLines = 8;
@@ -147,14 +99,14 @@ export const usePedidoForm = () => {
       Alert.alert('Error', 'El carrito está vacío');
       return false;
     }
-    
+
     // Verificar que todos los items tengan productos válidos
     const invalidItems = items.filter(item => !item.producto_id || item.producto_id.trim() === '');
     if (invalidItems.length > 0) {
       Alert.alert('Error', 'Hay productos inválidos en el carrito');
       return false;
     }
-    
+
     if (esDomicilio && !direccionEnvio.trim()) {
       Alert.alert('Error', 'Debes ingresar la dirección de envío');
       return false;
@@ -208,8 +160,6 @@ export const usePedidoForm = () => {
     setShowItemModal,
     setEditingItemIndex,
     setTempItem,
-    handleAddItem,
-    handleEditItem,
     handleRemoveItem,
     handleDescripcionChange,
     loadFilteredOptions,

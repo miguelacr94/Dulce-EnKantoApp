@@ -24,7 +24,6 @@ import { debounce } from '@/utils/debounce';
 
 // Componentes de pedidos reutilizables
 import {
-  ItemModal,
   ItemsList,
   OrderSummary,
   ClienteForm,
@@ -75,8 +74,6 @@ const EditarPedidoScreen: React.FC = () => {
     setShowItemModal,
     setEditingItemIndex,
     setTempItem,
-    handleAddItem,
-    handleEditItem,
     handleRemoveItem,
     handleDescripcionChange,
     loadFilteredOptions,
@@ -147,10 +144,10 @@ const EditarPedidoScreen: React.FC = () => {
         console.log('Cargando pedido con ID:', pedidoId);
         const pedido = await getPedidoById(pedidoId);
         console.log('Pedido cargado:', pedido);
-        
+
         if (pedido) {
           setPedidoActual(pedido);
-          
+
           // Cargar el formulario con los datos del pedido
           setClienteNombre(pedido.cliente_nombre || '');
           setClienteTelefono(pedido.cliente_telefono || '');
@@ -159,23 +156,23 @@ const EditarPedidoScreen: React.FC = () => {
           setPrecioDomicilio(pedido.precio_domicilio || 0);
           setEsDomicilio(pedido.es_domicilio || false);
           setDireccionEnvio(pedido.direccion_envio || '');
-          
+
           // Inicializar selectedDate con la fecha del pedido
           if (pedido.fecha_entrega) {
             const orderDate = new Date(pedido.fecha_entrega);
             setSelectedDate(orderDate);
           }
-          
+
           // Cargar los items del pedido
           if (pedido.items && pedido.items.length > 0) {
             console.log('Items del pedido:', pedido.items);
-            
+
             // Filtrar items que tengan productos válidos y datos completos
             const validOrderItems = pedido.items.filter(item => {
               const hasProduct = item.producto && item.producto.id && item.producto.id.trim() !== '';
               const hasValidQuantity = item.cantidad && item.cantidad > 0;
               const hasValidPrice = item.precio_unitario && item.precio_unitario >= 0;
-              
+
               console.log(`Validando item ${item.id}:`, {
                 hasProduct,
                 hasValidQuantity,
@@ -184,12 +181,12 @@ const EditarPedidoScreen: React.FC = () => {
                 cantidad: item.cantidad,
                 precio_unitario: item.precio_unitario
               });
-              
+
               return hasProduct && hasValidQuantity && hasValidPrice;
             });
-            
+
             console.log('Items válidos del pedido:', validOrderItems);
-            
+
             if (validOrderItems.length === 0) {
               console.warn('No hay items válidos en el pedido');
               setTimeout(() => {
@@ -198,7 +195,7 @@ const EditarPedidoScreen: React.FC = () => {
               }, 100);
               return;
             }
-            
+
             const formattedItems = validOrderItems.map(item => ({
               producto_id: item.producto?.id || '', // Usar optional chaining para TypeScript
               sabor_id: item.sabor?.id || null,
@@ -207,9 +204,9 @@ const EditarPedidoScreen: React.FC = () => {
               cantidad: item.cantidad,
               precio_unitario: item.precio_unitario,
             }));
-            
+
             console.log('Items formateados:', formattedItems);
-            
+
             // Establecer los items directamente con un pequeño retraso
             setTimeout(() => {
               setItems(formattedItems);
@@ -276,18 +273,36 @@ const EditarPedidoScreen: React.FC = () => {
   };
 
   const handleOpenItemModal = () => {
-    setTempItem({
-      producto_id: '',
-      sabor_id: '',
-      relleno_id: '',
-      tamano_id: '',
-      cantidad: 1,
-      precio_unitario: 0,
-    });
-    setFilteredOptions({ sabores: [], tamanos: [] });
-    setEditingItemIndex(null);
-    setShowItemModal(true);
+    navigation.navigate('AddItem', { returnTo: 'EditarPedido', pedidoId });
   };
+
+  const handleEditItemLocal = (index: number) => {
+    navigation.navigate('AddItem', {
+      initialItem: items[index],
+      editingIndex: index,
+      returnTo: 'EditarPedido',
+      pedidoId
+    });
+  };
+
+  // Escuchar cuando volvemos de AddItem con un nuevo item
+  React.useEffect(() => {
+    const routeParams = route.params as any;
+    if (routeParams?.newItem) {
+      const { newItem, editingIndex } = routeParams;
+
+      if (editingIndex !== undefined && editingIndex !== null) {
+        const newItems = [...items];
+        newItems[editingIndex] = newItem;
+        setItems(newItems);
+      } else {
+        setItems([...items, newItem]);
+      }
+
+      // Limpiar los parámetros
+      navigation.setParams({ newItem: undefined, editingIndex: undefined } as any);
+    }
+  }, [route.params]);
 
   const handleSelectProducto = (producto: Producto) => {
     setTempItem((prev: CrearPedidoItemDTO) => ({
@@ -348,7 +363,7 @@ const EditarPedidoScreen: React.FC = () => {
             items={items}
             productos={productos}
             sabores={sabores}
-            onEditItem={handleEditItem}
+            onEditItem={handleEditItemLocal}
             onRemoveItem={handleRemoveItem}
             onAddItem={handleOpenItemModal}
           />
@@ -384,22 +399,7 @@ const EditarPedidoScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Modal para agregar/editar items */}
-      <ItemModal
-        visible={showItemModal}
-        editingItem={editingItemIndex !== null}
-        tempItem={tempItem}
-        productos={productos}
-        sabores={sabores}
-        tamanos={tamanos}
-        filteredOptions={filteredOptions}
-        showProductoSelector={showProductoSelector}
-        onTempItemChange={handleTempItemChange}
-        onClose={() => setShowItemModal(false)}
-        onSubmit={handleAddItem}
-        onShowProductoSelector={setShowProductoSelector}
-        onSelectProducto={handleSelectProducto}
-      />
+      {/* Modal para agregar/editar items eliminado ya que ahora es una screen */}
 
       {/* DateTimePicker */}
       {showDatePicker && (

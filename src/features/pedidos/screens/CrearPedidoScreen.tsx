@@ -11,9 +11,10 @@ import {
   Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@/app/navigation/AppNavigator';
+import { RouteProp } from '@react-navigation/native';
 import { usePedidos, type CrearPedidoItemDTO } from '@/features/pedidos';
 import { useAbonos } from '@/features/pedidos/hooks';
 import { useMetadata, type Producto } from '@/features/productos';
@@ -23,7 +24,6 @@ import { debounce } from '@/utils/debounce';
 
 // Componentes de pedidos reutilizables
 import {
-  ItemModal,
   ItemsList,
   OrderSummary,
   ClienteForm,
@@ -34,6 +34,7 @@ type CrearPedidoScreenNavigationProp = StackNavigationProp<RootStackParamList, '
 
 const CrearPedidoScreen: React.FC = () => {
   const navigation = useNavigation<CrearPedidoScreenNavigationProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'CrearPedido'>>();
   const { createPedido, isCreating } = usePedidos();
   const { createAbono } = useAbonos();
   const { productos, sabores, tamanos, isLoading: isLoadingMetadata } = useMetadata();
@@ -65,9 +66,8 @@ const CrearPedidoScreen: React.FC = () => {
     setDireccionEnvio,
     setShowItemModal,
     setEditingItemIndex,
+    setItems,
     setTempItem,
-    handleAddItem,
-    handleEditItem,
     handleRemoveItem,
     handleDescripcionChange,
     loadFilteredOptions,
@@ -84,7 +84,7 @@ const CrearPedidoScreen: React.FC = () => {
   // Función debounced para prevenir múltiples ejecuciones
   const debouncedSubmit = debounce(async () => {
     if (isSubmitting || isCreating) return;
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -166,18 +166,35 @@ const CrearPedidoScreen: React.FC = () => {
   };
 
   const handleOpenItemModal = () => {
-    setTempItem({
-      producto_id: '',
-      sabor_id: '',
-      relleno_id: '',
-      tamano_id: '',
-      cantidad: 1,
-      precio_unitario: 0,
-    });
-    setFilteredOptions({ sabores: [], tamanos: [] });
-    setEditingItemIndex(null);
-    setShowItemModal(true);
+    navigation.navigate('AddItem', { returnTo: 'CrearPedido' });
   };
+
+  const handleEditItem = (index: number) => {
+    navigation.navigate('AddItem', {
+      initialItem: items[index],
+      editingIndex: index,
+      returnTo: 'CrearPedido'
+    });
+  };
+
+  // Escuchar cuando volvemos de AddItem con un nuevo item
+  React.useEffect(() => {
+    const routeParams = route.params as any;
+    if (routeParams?.newItem) {
+      const { newItem, editingIndex } = routeParams;
+
+      if (editingIndex !== undefined && editingIndex !== null) {
+        const newItems = [...items];
+        newItems[editingIndex] = newItem;
+        setItems(newItems);
+      } else {
+        setItems([...items, newItem]);
+      }
+
+      // Limpiar los parámetros para que no se procesen de nuevo al volver a entrar
+      navigation.setParams({ newItem: undefined, editingIndex: undefined } as any);
+    }
+  }, [route.params]);
 
   const handleSelectProducto = (producto: Producto) => {
     setTempItem((prev: CrearPedidoItemDTO) => ({
@@ -252,22 +269,7 @@ const CrearPedidoScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Modal para agregar/editar items */}
-      <ItemModal
-        visible={showItemModal}
-        editingItem={editingItemIndex !== null}
-        tempItem={tempItem}
-        productos={productos}
-        sabores={sabores}
-        tamanos={tamanos}
-        filteredOptions={filteredOptions}
-        showProductoSelector={showProductoSelector}
-        onTempItemChange={setTempItem}
-        onClose={() => setShowItemModal(false)}
-        onSubmit={handleAddItem}
-        onShowProductoSelector={setShowProductoSelector}
-        onSelectProducto={handleSelectProducto}
-      />
+      {/* Modal para agregar/editar items eliminado ya que ahora es una screen */}
 
       {/* DateTimePicker */}
       {showDatePicker && (

@@ -5,7 +5,9 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { pedidosRepository, PedidoRepositoryError } from '../api/pedidos.repository';
+import { notificationService } from '@/app/core/notifications';
 import type {
   Pedido,
   PedidoConDetalles,
@@ -99,6 +101,13 @@ export function usePedidos(): UsePedidosReturn {
     },
   });
 
+  // Programar automáticamente las notificaciones cuando se cargan los pedidos
+  useEffect(() => {
+    if (pedidos.length > 0 && !isLoading) {
+      notificationService.reschedulePedidosNotifications(pedidos).catch(console.error);
+    }
+  }, [pedidos, isLoading]);
+
   // Query: Estadísticas
   const {
     data: estadisticas,
@@ -120,11 +129,40 @@ export function usePedidos(): UsePedidosReturn {
       pedido: CrearPedidoDTO;
       items: CrearPedidoItemDTO[];
     }) => pedidosRepository.create(pedido, items),
-    onSuccess: () => {
+    onSuccess: async (result, variables) => {
       queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
+      
+      // Programar notificación para el nuevo pedido
+      if (result.estado === 'pendiente' && result.fecha_entrega) {
+        try {
+          // Extraer hora de la fecha de entrega
+          const fechaEntrega = new Date(result.fecha_entrega);
+          const horaEntrega = fechaEntrega.toLocaleTimeString('es-CO', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+          
+          // Extraer nombres de productos de los items
+          const productos = variables.items?.map((item: any) => {
+            // Intentar obtener nombre del producto, si no hay usar ID
+            return item.producto_nombre || item.producto_id || 'Producto';
+          }) || [];
+          
+          await notificationService.schedulePedidoNotification({
+            pedidoId: result.id,
+            clienteNombre: result.cliente_nombre,
+            productos,
+            horaEntrega,
+            fechaEntrega: result.fecha_entrega,
+          });
+        } catch (error) {
+          console.error('Error scheduling notification for new pedido:', error);
+        }
+      }
     },
     onError: (error) => {
       console.error('Error creating pedido:', error);
@@ -142,14 +180,17 @@ export function usePedidos(): UsePedidosReturn {
       pedido: ActualizarPedidoDTO;
       items?: CrearPedidoItemDTO[];
     }) => pedidosRepository.update(id, pedido, items),
-    onSuccess: (_, variables) => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
-      queryClient.invalidateQueries({
-        queryKey: PEDIDOS_QUERY_KEYS.detail(variables.id),
-      });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
+      
+      // Reprogramar notificaciones después de actualizar
+      setTimeout(() => {
+        const currentPedidos = queryClient.getQueryData<PedidoConDetalles[]>(PEDIDOS_QUERY_KEYS.lists()) || [];
+        notificationService.reschedulePedidosNotifications(currentPedidos).catch(console.error);
+      }, 100);
     },
   });
 
@@ -157,25 +198,34 @@ export function usePedidos(): UsePedidosReturn {
   const cambiarEstadoMutation = useMutation({
     mutationFn: ({ id, estado }: { id: string; estado: EstadoPedido }) =>
       pedidosRepository.cambiarEstado(id, estado),
-    onSuccess: (_, variables) => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
-      queryClient.invalidateQueries({
-        queryKey: PEDIDOS_QUERY_KEYS.detail(variables.id),
-      });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
+      
+      // Reprogramar notificaciones después de cambiar estado
+      setTimeout(() => {
+        const currentPedidos = queryClient.getQueryData<PedidoConDetalles[]>(PEDIDOS_QUERY_KEYS.lists()) || [];
+        notificationService.reschedulePedidosNotifications(currentPedidos).catch(console.error);
+      }, 100);
     },
   });
 
   // Mutation: Eliminar pedido
   const deleteMutation = useMutation({
     mutationFn: (id: string) => pedidosRepository.delete(id),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
+      
+      // Reprogramar notificaciones después de eliminar
+      setTimeout(() => {
+        const currentPedidos = queryClient.getQueryData<PedidoConDetalles[]>(PEDIDOS_QUERY_KEYS.lists()) || [];
+        notificationService.reschedulePedidosNotifications(currentPedidos).catch(console.error);
+      }, 100);
     },
   });
 
