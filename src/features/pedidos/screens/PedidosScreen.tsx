@@ -29,7 +29,7 @@ const PedidosScreen: React.FC = () => {
   const [busqueda, setBusqueda] = useState('');
 
   // Filtrar pedidos según el estado y búsqueda
-  const pedidosFiltrados = pedidos.filter(pedido => {
+  let pedidosFiltrados = pedidos.filter(pedido => {
     const coincideEstado = filtro === 'todos' || pedido.estado === filtro;
     const coincideBusqueda = busqueda === '' ||
       (pedido.cliente_nombre && pedido.cliente_nombre.toLowerCase().includes(busqueda.toLowerCase())) ||
@@ -38,6 +38,13 @@ const PedidosScreen: React.FC = () => {
 
     return coincideEstado && coincideBusqueda;
   });
+
+  // Ordenar por fecha de entrega solo cuando el filtro es 'entregado'
+  if (filtro === 'entregado') {
+    pedidosFiltrados = [...pedidosFiltrados].sort((a, b) => 
+      new Date(b.fecha_entrega).getTime() - new Date(a.fecha_entrega).getTime()
+    );
+  }
 
 
   console.log('pedidosFiltrados', pedidosFiltrados);
