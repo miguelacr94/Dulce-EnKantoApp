@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { useMetadata, type Producto } from '@/features/productos';
 import { formatCurrency, formatDateForDB, formatDateTimeForDB } from '@/utils';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '@/utils';
 import { debounce } from '@/utils/debounce';
+import { useItemsStore } from '../stores/useItemsStore';
 
 // Componentes de pedidos reutilizables
 import {
@@ -38,6 +39,15 @@ const CrearPedidoScreen: React.FC = () => {
   const { createPedido, isCreating } = usePedidos();
   const { createAbono } = useAbonos();
   const { productos, sabores, tamanos, isLoading: isLoadingMetadata } = useMetadata();
+  
+  // Store global de items para creación
+  const { 
+    crearItems, 
+    setCrearItems, 
+    addCrearItem, 
+    updateCrearItem, 
+    removeCrearItem 
+  } = useItemsStore();
 
   // Hook personalizado para manejar el formulario
   const {
@@ -68,10 +78,11 @@ const CrearPedidoScreen: React.FC = () => {
     setEditingItemIndex,
     setItems,
     setTempItem,
-    handleRemoveItem,
+    handleRemoveItem: handleRemoveItemFromForm,
     handleDescripcionChange,
     loadFilteredOptions,
     validateForm,
+    resetForm,
   } = usePedidoForm();
 
   // Estado para modales
@@ -90,14 +101,14 @@ const CrearPedidoScreen: React.FC = () => {
     setIsSubmitting(true);
     try {
       // Determinamos el tipo de producto general basado en el primer item (legacy support en la cabecera)
-      const firstProduct = productos.find(p => p.id === items[0].producto_id);
+      const firstProduct = productos.find(p => p.id === crearItems[0]?.producto_id);
 
       const newPedido = await createPedido({
         cliente_nombre: clienteNombre,
         cliente_telefono: clienteTelefono,
         tipo_producto: 'torta', // Valor por defecto ya que no existe en Producto
         peso: 0, // Legacy
-        cantidad: items.length, // Legacy
+        cantidad: crearItems.length, // Legacy
         sabor: '', // Legacy
         descripcion: descripcion.trim(),
         precio_total: precioTotal,
@@ -105,7 +116,7 @@ const CrearPedidoScreen: React.FC = () => {
         es_domicilio: esDomicilio,
         direccion_envio: esDomicilio ? direccionEnvio : undefined,
         fecha_entrega: fechaEntrega,
-      }, items);
+      }, crearItems);
 
       if (abonoInicial > 0) {
         await createAbono({
@@ -115,7 +126,10 @@ const CrearPedidoScreen: React.FC = () => {
         });
       }
 
-      Alert.alert('Éxito', 'Pedido creado correctamente', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      Alert.alert('Éxito', 'Pedido creado correctamente', [{ text: 'OK', onPress: () => {
+        resetForm(); // Limpiar el formulario después de crear el pedido
+        navigation.goBack();
+      }}]);
     } catch (error) {
       // Error al crear pedido
       Alert.alert('Error', 'No se pudo crear el pedido');
@@ -171,30 +185,34 @@ const CrearPedidoScreen: React.FC = () => {
 
   const handleEditItem = (index: number) => {
     navigation.navigate('AddItem', {
-      initialItem: items[index],
+      initialItem: crearItems[index],
       editingIndex: index,
       returnTo: 'CrearPedido'
     });
   };
 
+  const handleRemoveItem = (index: number) => {
+    removeCrearItem(index);
+  };
+
   // Escuchar cuando volvemos de AddItem con un nuevo item
-  React.useEffect(() => {
+  useEffect(() => {
     const routeParams = route.params as any;
     if (routeParams?.newItem) {
       const { newItem, editingIndex } = routeParams;
 
       if (editingIndex !== undefined && editingIndex !== null) {
-        const newItems = [...items];
-        newItems[editingIndex] = newItem;
-        setItems(newItems);
+        // Estamos editando un item existente
+        updateCrearItem(editingIndex, newItem);
       } else {
-        setItems([...items, newItem]);
+        // Estamos agregando un nuevo item
+        addCrearItem(newItem);
       }
 
-      // Limpiar los parámetros para que no se procesen de nuevo al volver a entrar
+      // Limpiar los parámetros
       navigation.setParams({ newItem: undefined, editingIndex: undefined } as any);
     }
-  }, [route.params]);
+  }, [route.params, updateCrearItem, addCrearItem, navigation]);
 
   const handleSelectProducto = (producto: Producto) => {
     setTempItem((prev: CrearPedidoItemDTO) => ({
@@ -230,11 +248,11 @@ const CrearPedidoScreen: React.FC = () => {
 
           {/* Carrito de Items */}
           <ItemsList
-            items={items}
+            items={crearItems}
             productos={productos}
             sabores={sabores}
             onEditItem={handleEditItem}
-            onRemoveItem={handleRemoveItem}
+            onRemoveItem={handleRemoveItemFromForm}
             onAddItem={handleOpenItemModal}
           />
 
@@ -261,6 +279,21 @@ const CrearPedidoScreen: React.FC = () => {
           <View style={styles.actionsContainer}>
             <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
               <Text>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.clearButton} 
+              onPress={() => {
+                Alert.alert(
+                  'Limpiar Formulario', 
+                  '¿Estás seguro de que quieres limpiar todos los datos del formulario?',
+                  [
+                    { text: 'No', style: 'cancel' },
+                    { text: 'Sí', onPress: () => resetForm() }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.clearButtonText}>Limpiar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isCreating || isSubmitting}>
               <Text style={{ color: 'white' }}>{isCreating || isSubmitting ? 'Creando...' : 'Crear Pedido'}</Text>
@@ -308,7 +341,7 @@ const styles = StyleSheet.create({
   },
   actionsContainer: {
     flexDirection: 'row' as const,
-    gap: SPACING.md,
+    gap: SPACING.sm,
     marginTop: SPACING.xl,
   },
   cancelButton: {
@@ -319,8 +352,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  submitButton: {
+  clearButton: {
     flex: 1,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center' as const,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: 'transparent',
+  },
+  clearButtonText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  submitButton: {
+    flex: 1.5,
     backgroundColor: COLORS.primary,
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,

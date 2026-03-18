@@ -4,6 +4,7 @@ import { useAppStore } from '@/app/store/appStore';
 import { useEffect } from 'react';
 import { Pedido, PedidoConDetalles, EstadoPedido, PedidoItem } from '@/features/pedidos/types';
 import { notificationService } from '@/app/core/notifications';
+import { notificationService as pedidoNotificationService } from '@/services/notifications.service';
 
 export const usePedidos = () => {
   const queryClient = useQueryClient();
@@ -43,10 +44,15 @@ export const usePedidos = () => {
       pedido: Omit<Pedido, 'id' | 'created_at' | 'estado'>; 
       items: Omit<PedidoItem, 'id' | 'pedido_id'>[];
     }) => pedidosService.createPedido(pedido, items),
-    onSuccess: () => {
+    onSuccess: async (data) => {
       // Refrescamos los pedidos para obtener los datos completos
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       setError(null);
+      
+      // Programar notificación para el nuevo pedido
+      if (data && data.estado === 'pendiente') {
+        await pedidoNotificationService.schedulePedidoReminder(data);
+      }
     },
     onError: (error) => {
       setError(error instanceof Error ? error.message : 'Error al crear pedido');
@@ -60,9 +66,17 @@ export const usePedidos = () => {
       pedido: Partial<Pedido>; 
       items?: Omit<PedidoItem, 'id' | 'pedido_id'>[];
     }) => pedidosService.updatePedido(id, pedido, items),
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       setError(null);
+      
+      // Manejar notificaciones para el pedido actualizado
+      if (data) {
+        await pedidoNotificationService.cancelPedidoReminder(data.id);
+        if (data.estado === 'pendiente') {
+          await pedidoNotificationService.schedulePedidoReminder(data);
+        }
+      }
     },
     onError: (error) => {
       setError(error instanceof Error ? error.message : 'Error al actualizar pedido');
@@ -73,10 +87,18 @@ export const usePedidos = () => {
   const cambiarEstadoMutation = useMutation({
     mutationFn: ({ id, estado }: { id: string; estado: EstadoPedido }) =>
       pedidosService.cambiarEstado(id, estado),
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       queryClient.invalidateQueries({ queryKey: ['estadisticas'] });
       setError(null);
+      
+      // Manejar notificaciones al cambiar estado
+      if (data) {
+        await pedidoNotificationService.cancelPedidoReminder(data.id);
+        if (data.estado === 'pendiente') {
+          await pedidoNotificationService.schedulePedidoReminder(data);
+        }
+      }
     },
     onError: (error) => {
       setError(error instanceof Error ? error.message : 'Error al cambiar estado');
@@ -85,16 +107,35 @@ export const usePedidos = () => {
 
   // Mutation para eliminar pedido
   const deletePedidoMutation = useMutation({
-    mutationFn: pedidosService.deletePedido,
-    onSuccess: () => {
+    mutationFn: (id: string) => pedidosService.deletePedido(id),
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] });
       queryClient.invalidateQueries({ queryKey: ['estadisticas'] });
       setError(null);
+      
+      // Cancelar notificación del pedido eliminado
+      await pedidoNotificationService.cancelPedidoReminder(variables);
     },
     onError: (error) => {
       setError(error instanceof Error ? error.message : 'Error al eliminar pedido');
     }
   });
+
+  // Programar notificaciones para todos los pedidos pendientes
+  const scheduleAllPendingReminders = async () => {
+    const pendingPedidos = pedidos.filter(pedido => pedido.estado === 'pendiente');
+    
+    for (const pedido of pendingPedidos) {
+      await pedidoNotificationService.schedulePedidoReminder(pedido);
+    }
+  };
+
+  // Inicializar notificaciones cuando se cargan los pedidos
+  useEffect(() => {
+    if (pedidos.length > 0) {
+      scheduleAllPendingReminders();
+    }
+  }, [pedidos.length]); // Solo cuando cambia la cantidad de pedidos
 
   // Funciones helper
   const createPedido = (
@@ -149,6 +190,7 @@ export const usePedidos = () => {
     deletePedido: deletePedidoById,
     getPedidoById,
     getPedidosPorEstado,
+    scheduleAllPendingReminders,
     isCreating: createPedidoMutation.isPending,
     isUpdating: updatePedidoMutation.isPending,
     isChangingEstado: cambiarEstadoMutation.isPending,

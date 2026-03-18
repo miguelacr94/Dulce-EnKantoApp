@@ -29,6 +29,8 @@ const AddItemScreen: React.FC = () => {
     const route = useRoute<AddItemScreenRouteProp>();
     const { initialItem, editingIndex, returnTo } = route.params;
 
+    console.log('AddItemScreen montado con parámetros:', { initialItem, editingIndex, returnTo });
+
     const { productos, sabores, tamanos, isLoading: isLoadingMetadata } = useMetadata();
 
     const [tempItem, setTempItem] = useState<CrearPedidoItemDTO>(
@@ -104,17 +106,30 @@ const AddItemScreen: React.FC = () => {
 
     const handleSubmit = () => {
         if (validateForm()) {
+            console.log('AddItem handleSubmit - tempItem:', tempItem);
+            console.log('AddItem handleSubmit - editingIndex:', editingIndex);
+            console.log('AddItem handleSubmit - returnTo:', returnTo);
+            
             if (returnTo === 'CrearPedido') {
+                console.log('Navegando a CrearPedido con:', {
+                    newItem: tempItem,
+                    editingIndex: editingIndex,
+                });
                 navigation.navigate('CrearPedido', {
                     newItem: tempItem,
                     editingIndex: editingIndex,
                 });
             } else {
-                navigation.navigate('EditarPedido', {
-                    pedidoId: route.params.pedidoId || '',
+                console.log('Volviendo a EditarPedido con:', {
                     newItem: tempItem,
                     editingIndex: editingIndex,
                 });
+                // Usar setParams para pasar los datos sin recargar la pantalla
+                navigation.setParams({
+                    newItem: tempItem,
+                    editingIndex: editingIndex,
+                } as any);
+                navigation.goBack();
             }
         }
     };

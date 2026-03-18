@@ -4,19 +4,112 @@ import { Producto, Sabor, Tamano } from '@/types';
 import { CrearPedidoItemDTO } from '@/features/pedidos/types';
 import { metadataService } from '@/services';
 import { formatDateTimeForDB } from '@/utils';
+import { create } from 'zustand';
+import { useItemsStore } from '../stores/useItemsStore';
 
-export const usePedidoForm = () => {
-  // Estado del pedido (cabecera y carrito)
-  const [clienteNombre, setClienteNombre] = useState('');
-  const [clienteTelefono, setClienteTelefono] = useState('');
-  const [items, setItems] = useState<CrearPedidoItemDTO[]>([]);
-  const [precioTotal, setPrecioTotal] = useState(0);
-  const [precioDomicilio, setPrecioDomicilio] = useState(0);
-  const [esDomicilio, setEsDomicilio] = useState(false);
-  const [direccionEnvio, setDireccionEnvio] = useState('');
-  const [fechaEntrega, setFechaEntrega] = useState(formatDateTimeForDB(new Date()));
-  const [abonoInicial, setAbonoInicial] = useState(0);
-  const [descripcion, setDescripcion] = useState('');
+// Interfaz para el estado del formulario
+interface PedidoFormState {
+  clienteNombre: string;
+  clienteTelefono: string;
+  items: CrearPedidoItemDTO[];
+  precioTotal: number;
+  precioDomicilio: number;
+  esDomicilio: boolean;
+  direccionEnvio: string;
+  fechaEntrega: string;
+  abonoInicial: number;
+  descripcion: string;
+  descripcionHeight: number;
+  setFormState: (state: Partial<PedidoFormState>) => void;
+  resetFormState: () => void;
+}
+
+// Store de Zustand para el estado del formulario de CREACIÓN
+const useCrearPedidoFormStore = create<PedidoFormState>((set) => ({
+  clienteNombre: '',
+  clienteTelefono: '',
+  items: [],
+  precioTotal: 0,
+  precioDomicilio: 0,
+  esDomicilio: false,
+  direccionEnvio: '',
+  fechaEntrega: formatDateTimeForDB(new Date()),
+  abonoInicial: 0,
+  descripcion: '',
+  descripcionHeight: 80,
+  
+  setFormState: (state) => set((prev) => ({ ...prev, ...state })),
+  resetFormState: () => ({
+    clienteNombre: '',
+    clienteTelefono: '',
+    items: [],
+    precioTotal: 0,
+    precioDomicilio: 0,
+    esDomicilio: false,
+    direccionEnvio: '',
+    fechaEntrega: formatDateTimeForDB(new Date()),
+    abonoInicial: 0,
+    descripcion: '',
+    descripcionHeight: 80,
+  }),
+}));
+
+// Store de Zustand para el estado del formulario de EDICIÓN
+const useEditarPedidoFormStore = create<PedidoFormState>((set) => ({
+  clienteNombre: '',
+  clienteTelefono: '',
+  items: [],
+  precioTotal: 0,
+  precioDomicilio: 0,
+  esDomicilio: false,
+  direccionEnvio: '',
+  fechaEntrega: formatDateTimeForDB(new Date()),
+  abonoInicial: 0,
+  descripcion: '',
+  descripcionHeight: 80,
+  
+  setFormState: (state) => set((prev) => ({ ...prev, ...state })),
+  resetFormState: () => ({
+    clienteNombre: '',
+    clienteTelefono: '',
+    items: [],
+    precioTotal: 0,
+    precioDomicilio: 0,
+    esDomicilio: false,
+    direccionEnvio: '',
+    fechaEntrega: formatDateTimeForDB(new Date()),
+    abonoInicial: 0,
+    descripcion: '',
+    descripcionHeight: 80,
+  }),
+}));
+
+export const usePedidoForm = (isEditing: boolean = false) => {
+  // Seleccionar el store apropiado según si estamos editando o creando
+  const store = isEditing ? useEditarPedidoFormStore() : useCrearPedidoFormStore();
+  
+  // Store global de items
+  const { 
+    clearCrearItems, 
+    clearEditarItems 
+  } = useItemsStore();
+  
+  // Obtener estado y acciones del store de Zustand
+  const {
+    clienteNombre,
+    clienteTelefono,
+    items,
+    precioTotal,
+    precioDomicilio,
+    esDomicilio,
+    direccionEnvio,
+    fechaEntrega,
+    abonoInicial,
+    descripcion,
+    descripcionHeight,
+    setFormState,
+    resetFormState,
+  } = store;
 
   // Estados que aún podrían necesitarse para la transición o por otros componentes
   const [showItemModal, setShowItemModal] = useState(false);
@@ -38,14 +131,15 @@ export const usePedidoForm = () => {
     tamanos: [],
   });
 
-  const [descripcionHeight, setDescripcionHeight] = useState(80);
-
   // Calcular precio total automáticamente al cambiar items o domicilio
   useEffect(() => {
-    const itemsTotal = items.reduce((sum, item) => sum + (item.precio_unitario * item.cantidad), 0);
+    const itemsTotal = items.reduce((sum: number, item: CrearPedidoItemDTO) => sum + (item.precio_unitario * item.cantidad), 0);
     const domicilioCost = esDomicilio ? precioDomicilio : 0;
-    setPrecioTotal(itemsTotal + domicilioCost);
-  }, [items, esDomicilio, precioDomicilio]);
+    const newTotal = itemsTotal + domicilioCost;
+    if (newTotal !== precioTotal) {
+      setFormState({ precioTotal: newTotal });
+    }
+  }, [items, esDomicilio, precioDomicilio, precioTotal, setFormState]);
 
   const loadFilteredOptions = async (productoId: string) => {
     try {
@@ -68,12 +162,12 @@ export const usePedidoForm = () => {
   };
 
   const handleRemoveItem = (index: number) => {
-    const newItems = items.filter((_, i) => i !== index);
-    setItems(newItems);
+    const newItems = items.filter((_: any, i: number) => i !== index);
+    setFormState({ items: newItems });
   };
 
   const handleDescripcionChange = (text: string) => {
-    setDescripcion(text);
+    setFormState({ descripcion: text });
 
     const lineHeight = 20;
     const minLines = 3;
@@ -83,7 +177,7 @@ export const usePedidoForm = () => {
     const estimatedLines = Math.max(minLines, Math.min(lines, maxLines));
     const newHeight = estimatedLines * lineHeight + 20;
 
-    setDescripcionHeight(newHeight);
+    setFormState({ descripcionHeight: newHeight });
   };
 
   const validateForm = () => {
@@ -101,7 +195,7 @@ export const usePedidoForm = () => {
     }
 
     // Verificar que todos los items tengan productos válidos
-    const invalidItems = items.filter(item => !item.producto_id || item.producto_id.trim() === '');
+    const invalidItems = items.filter((item: CrearPedidoItemDTO) => !item.producto_id || item.producto_id.trim() === '');
     if (invalidItems.length > 0) {
       Alert.alert('Error', 'Hay productos inválidos en el carrito');
       return false;
@@ -119,14 +213,13 @@ export const usePedidoForm = () => {
   };
 
   const resetForm = () => {
-    setClienteNombre('');
-    setClienteTelefono('');
-    setItems([]);
-    setPrecioTotal(0);
-    setFechaEntrega(formatDateTimeForDB(new Date()));
-    setAbonoInicial(0);
-    setDescripcion('');
-    setDescripcionHeight(80);
+    resetFormState();
+    // Limpiar también los items del store global correspondiente
+    if (isEditing) {
+      clearEditarItems();
+    } else {
+      clearCrearItems();
+    }
   };
 
   return {
@@ -149,14 +242,24 @@ export const usePedidoForm = () => {
     setFilteredOptions,
 
     // Acciones
-    setClienteNombre,
-    setClienteTelefono,
-    setItems,
-    setFechaEntrega,
-    setAbonoInicial,
-    setPrecioDomicilio,
-    setEsDomicilio,
-    setDireccionEnvio,
+    setClienteNombre: (value: string) => setFormState({ clienteNombre: value }),
+    setClienteTelefono: (value: string) => setFormState({ clienteTelefono: value }),
+    setItems: (value: CrearPedidoItemDTO[] | ((prev: CrearPedidoItemDTO[]) => CrearPedidoItemDTO[])) => {
+      if (typeof value === 'function') {
+        // Si es un callback, obtener el estado actual y aplicar la función
+        const currentItems = store.items;
+        const newItems = value(currentItems);
+        setFormState({ items: newItems });
+      } else {
+        // Si es un valor directo, establecerlo directamente
+        setFormState({ items: value });
+      }
+    },
+    setFechaEntrega: (value: string) => setFormState({ fechaEntrega: value }),
+    setAbonoInicial: (value: number) => setFormState({ abonoInicial: value }),
+    setPrecioDomicilio: (value: number) => setFormState({ precioDomicilio: value }),
+    setEsDomicilio: (value: boolean) => setFormState({ esDomicilio: value }),
+    setDireccionEnvio: (value: string) => setFormState({ direccionEnvio: value }),
     setShowItemModal,
     setEditingItemIndex,
     setTempItem,
@@ -164,7 +267,7 @@ export const usePedidoForm = () => {
     handleDescripcionChange,
     loadFilteredOptions,
     validateForm,
-    setDescripcion,
+    setDescripcion: (value: string) => setFormState({ descripcion: value }),
     resetForm,
   };
 };

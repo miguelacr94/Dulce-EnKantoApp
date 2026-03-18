@@ -103,61 +103,59 @@ const MainTabs = () => {
 // Navegador principal
 const AppNavigator = () => {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        id="root-stack"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#FFB6C1',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-        }}
-      >
-        <Stack.Screen
-          name="MainTabs"
-          component={MainTabs}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="PedidoDetalle"
-          component={PedidoDetalleScreen}
-          options={{ title: 'Detalle del Pedido' }}
-        />
-        <Stack.Screen
-          name="CrearPedido"
-          component={CrearPedidoScreen}
-          options={{ title: 'Crear Pedido' }}
-        />
-        <Stack.Screen
-          name="EditarPedido"
-          component={EditarPedidoScreen}
-          options={{ title: 'Editar Pedido' }}
-        />
-        <Stack.Screen
-          name="GestionProductos"
-          component={GestionProductosScreen}
-          options={{ title: 'Gestionar Productos' }}
-        />
-        <Stack.Screen
-          name="GestionSabores"
-          component={GestionSaboresScreen}
-          options={{ title: 'Gestionar Sabores' }}
-        />
-        <Stack.Screen
-          name="GestionTamanos"
-          component={GestionTamanosScreen}
-          options={{ title: 'Gestionar Tamaños' }}
-        />
-        <Stack.Screen
-          name="AddItem"
-          component={AddItemScreen}
-          options={{ title: 'Agregar Item' }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator
+      id="root-stack"
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#FFB6C1',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen
+        name="MainTabs"
+        component={MainTabs}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PedidoDetalle"
+        component={PedidoDetalleScreen}
+        options={{ title: 'Detalle del Pedido' }}
+      />
+      <Stack.Screen
+        name="CrearPedido"
+        component={CrearPedidoScreen}
+        options={{ title: 'Crear Pedido' }}
+      />
+      <Stack.Screen
+        name="EditarPedido"
+        component={EditarPedidoScreen}
+        options={{ title: 'Editar Pedido' }}
+      />
+      <Stack.Screen
+        name="GestionProductos"
+        component={GestionProductosScreen}
+        options={{ title: 'Gestionar Productos' }}
+      />
+      <Stack.Screen
+        name="GestionSabores"
+        component={GestionSaboresScreen}
+        options={{ title: 'Gestionar Sabores' }}
+      />
+      <Stack.Screen
+        name="GestionTamanos"
+        component={GestionTamanosScreen}
+        options={{ title: 'Gestionar Tamaños' }}
+      />
+      <Stack.Screen
+        name="AddItem"
+        component={AddItemScreen}
+        options={{ title: 'Agregar Item' }}
+      />
+    </Stack.Navigator>
   );
 };
 

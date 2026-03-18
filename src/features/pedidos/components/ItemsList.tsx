@@ -40,7 +40,7 @@ export const ItemsList: React.FC<ItemsListProps> = ({
         {items.map((item, index) => {
           const { product, sabor, relleno } = getItemInfo(item);
           return (
-            <View key={index} style={styles.itemRow}>
+            <View key={`${item.producto_id}-${index}-${item.cantidad}-${item.precio_unitario}`} style={styles.itemRow}>
               <View style={styles.itemInfo}>
                 <Text style={styles.productName}>
                   {product?.nombre} (x{item.cantidad})

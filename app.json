@@ -15,7 +15,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dulceenkanto.kiarapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["background-fetch", "background-processing"]
       }
     },
     "android": {
