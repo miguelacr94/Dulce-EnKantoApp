@@ -11,6 +11,7 @@ const ConfiguracionScreen: React.FC = () => {
         { title: 'Gestionar Productos', route: 'GestionProductos', icon: '🎂' },
         { title: 'Gestionar Sabores', route: 'GestionSabores', icon: '🍓' },
         { title: 'Gestionar Tamaños/Pesos', route: 'GestionTamanos', icon: '⚖️' },
+        { title: 'Gestionar Insumos', route: 'GestionInsumos', icon: '🥄' },
     ];
 
     return (
@@ -40,7 +41,7 @@ const styles = StyleSheet.create({
     card: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: COLORS.surface,
         padding: SPACING.lg,
         borderRadius: BORDER_RADIUS.lg,
         marginBottom: SPACING.md,

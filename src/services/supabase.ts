@@ -208,6 +208,31 @@ export interface Database {
           created_at?: string;
         };
       };
+      insumo: {
+        Row: {
+          id: number;
+          nombre: string;
+          medida: string;
+          cantidad: number;
+          tamano: {
+            id: string;
+            nombre: string;
+            tipo: 'peso' | 'tamano';
+          };
+        };
+        Insert: {
+          id?: number;
+          nombre: string;
+          medida: string;
+          cantidad?: number;
+        };
+        Update: {
+          id?: number;
+          nombre?: string;
+          medida?: string;
+          cantidad?: number;
+        };
+      };
     };
   };
 }

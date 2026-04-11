@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Dulce Enkanto",
-    "slug": "kiarapp",
+    "name": "Dulce Enkanto Pro",
+    "slug": "kiarapp-pro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/DulceEkanto.png",
@@ -16,7 +16,10 @@
       "bundleIdentifier": "com.dulceenkanto.kiarapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["background-fetch", "background-processing"]
+        "UIBackgroundModes": [
+          "background-fetch",
+          "background-processing"
+        ]
       }
     },
     "android": {
@@ -29,7 +32,8 @@
       "package": "com.dulceenkanto.kiarapp",
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.USE_EXACT_ALARM"
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ]
     },
     "web": {
@@ -37,8 +41,28 @@
     },
     "extra": {
       "eas": {
-        "projectId": "e348d593-5eea-4ef5-93c5-36093a1a4e05"
+        "projectId": "b5f1ab29-8806-4f65-8243-719d19f0fee9"
+      },
+      "router": {
+        "origin": false
       }
-    }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-notifications",
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25",
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ],
+      "expo-router"
+    ]
   }
 }

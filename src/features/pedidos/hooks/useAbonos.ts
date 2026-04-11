@@ -98,3 +98,10 @@ export const useAbonos = (pedidoId?: string) => {
     isDeleting: deleteAbonoMutation.isPending
   };
 };
+
+export const useTotalAbonos = () => {
+  return useQuery({
+    queryKey: ['abonos', 'total'],
+    queryFn: () => abonosService.getTotalSum(),
+  });
+};

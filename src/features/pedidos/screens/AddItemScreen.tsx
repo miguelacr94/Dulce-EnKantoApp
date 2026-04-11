@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { useQueryClient } from '@tanstack/react-query';
 import { RootStackParamList } from '@/app/navigation/AppNavigator';
 import { Producto, Sabor, Tamano } from '@/types';
 import { CrearPedidoItemDTO } from '@/features/pedidos/types';
 import { useMetadata } from '@/features/productos';
 import { COLORS, SPACING, BORDER_RADIUS, FONTS, SHADOWS } from '@/utils';
 import { metadataService } from '@/services';
+import { useItemsStore } from '../stores/useItemsStore';
 
 type AddItemScreenRouteProp = RouteProp<RootStackParamList, 'AddItem'>;
 type AddItemScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AddItem'>;
@@ -28,10 +30,47 @@ const AddItemScreen: React.FC = () => {
     const navigation = useNavigation<AddItemScreenNavigationProp>();
     const route = useRoute<AddItemScreenRouteProp>();
     const { initialItem, editingIndex, returnTo } = route.params;
+    const queryClient = useQueryClient();
 
-    console.log('AddItemScreen montado con parámetros:', { initialItem, editingIndex, returnTo });
+    // Store global para items
+    const { 
+        addCrearItem, 
+        updateCrearItem, 
+        addEditarItem, 
+        updateEditarItem 
+    } = useItemsStore();
 
-    const { productos, sabores, tamanos, isLoading: isLoadingMetadata } = useMetadata();
+
+    // Cargar productos directamente sin usar el hook
+    const [productos, setProductos] = useState<Producto[]>([]);
+    const [sabores, setSabores] = useState<Sabor[]>([]);
+    const [tamanos, setTamanos] = useState<Tamano[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Cargar datos al montar
+    useEffect(() => {
+        const cargarDatos = async () => {
+            try {
+                
+                const [productosData, saboresData, tamanosData] = await Promise.all([
+                    metadataService.getProductos(),
+                    metadataService.getSabores(),
+                    metadataService.getTamanos()
+                ]);
+                
+                
+                setProductos(productosData || []);
+                setSabores(saboresData || []);
+                setTamanos(tamanosData || []);
+                setIsLoading(false);
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+                setIsLoading(false);
+            }
+        };
+
+        cargarDatos();
+    }, [returnTo]); // Se ejecuta cada vez que cambia returnTo
 
     const [tempItem, setTempItem] = useState<CrearPedidoItemDTO>(
         initialItem || {
@@ -53,6 +92,30 @@ const AddItemScreen: React.FC = () => {
     });
 
     const [showProductoSelector, setShowProductoSelector] = useState(false);
+
+    useEffect(() => {
+        
+        // Forzar recarga si viene de editar pedido y no hay productos
+        if (returnTo === 'EditarPedido' && (!productos || productos.length === 0)) {
+            const cargarDatos = async () => {
+                try {
+                    const [productosData, saboresData, tamanosData] = await Promise.all([
+                        metadataService.getProductos(),
+                        metadataService.getSabores(),
+                        metadataService.getTamanos()
+                    ]);
+                    
+                    setProductos(productosData || []);
+                    setSabores(saboresData || []);
+                    setTamanos(tamanosData || []);
+                } catch (error) {
+                    console.error('Error en recarga forzada:', error);
+                }
+            };
+            
+            cargarDatos();
+        }
+    }, [productos, initialItem, returnTo]);
 
     useEffect(() => {
         if (tempItem.producto_id) {
@@ -106,31 +169,22 @@ const AddItemScreen: React.FC = () => {
 
     const handleSubmit = () => {
         if (validateForm()) {
-            console.log('AddItem handleSubmit - tempItem:', tempItem);
-            console.log('AddItem handleSubmit - editingIndex:', editingIndex);
-            console.log('AddItem handleSubmit - returnTo:', returnTo);
-            
             if (returnTo === 'CrearPedido') {
-                console.log('Navegando a CrearPedido con:', {
-                    newItem: tempItem,
-                    editingIndex: editingIndex,
-                });
-                navigation.navigate('CrearPedido', {
-                    newItem: tempItem,
-                    editingIndex: editingIndex,
-                });
-            } else {
-                console.log('Volviendo a EditarPedido con:', {
-                    newItem: tempItem,
-                    editingIndex: editingIndex,
-                });
-                // Usar setParams para pasar los datos sin recargar la pantalla
-                navigation.setParams({
-                    newItem: tempItem,
-                    editingIndex: editingIndex,
-                } as any);
-                navigation.goBack();
+                if (editingIndex !== undefined && editingIndex !== null) {
+                    updateCrearItem(editingIndex, tempItem);
+                } else {
+                    addCrearItem(tempItem);
+                }
+            } else if (returnTo === 'EditarPedido') {
+                if (editingIndex !== undefined && editingIndex !== null) {
+                    updateEditarItem(editingIndex, tempItem);
+                } else {
+                    addEditarItem(tempItem);
+                }
             }
+            
+            // Siempre volver atrás después de actualizar el store
+            navigation.goBack();
         }
     };
 
@@ -139,12 +193,37 @@ const AddItemScreen: React.FC = () => {
         ? tamanos.filter(t => t.tipo === selectedProduct.tipo_medida)
         : tamanos;
 
-    if (isLoadingMetadata) {
+    if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
                 <Text>Cargando metadatos...</Text>
             </View>
         );
+    }
+
+    // Verificar si hay productos disponibles
+    if (!isLoading && (!productos || productos.length === 0)) {
+        return (
+            <View style={styles.loadingContainer}>
+                <Text style={styles.errorText}>⚠️ No hay productos disponibles</Text>
+                <Text style={styles.errorSubtext}>
+                    No se encontraron productos en la base de datos.
+                </Text>
+                <Text style={styles.errorSubtext}>
+                    Por favor, agrega productos desde la configuración primero.
+                </Text>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Text style={styles.backButtonText}>Volver</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    // Verificar si hay problemas con la carga
+    if (!isLoading && (!sabores || sabores.length === 0)) {
     }
 
     return (
@@ -166,7 +245,17 @@ const AddItemScreen: React.FC = () => {
                         {/* Producto */}
                         <TouchableOpacity
                             style={styles.fieldContainer}
-                            onPress={() => setShowProductoSelector(true)}
+                            onPress={() => {
+                                if (!productos || productos.length === 0) {
+                                    Alert.alert(
+                                        'Error',
+                                        'No hay productos disponibles. Por favor, agrega productos desde la configuración.',
+                                        [{ text: 'OK' }]
+                                    );
+                                    return;
+                                }
+                                setShowProductoSelector(true);
+                            }}
                         >
                             <Text style={styles.label}>Producto *</Text>
                             <View style={styles.selectorButton}>
@@ -362,13 +451,13 @@ const AddItemScreen: React.FC = () => {
                 </ScrollView>
 
                 {/* Modal de selección de producto */}
-                <View>
-                    <Modal visible={showProductoSelector} transparent animationType="fade">
-                        <View style={styles.modalOverlay}>
-                            <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>Seleccionar Producto</Text>
-                                <ScrollView>
-                                    {[...productos].reverse().map(p => (
+                <Modal visible={showProductoSelector} transparent animationType="fade">
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>Seleccionar Producto</Text>
+                            <ScrollView style={{ maxHeight: 300 }}>
+                                {productos && productos.length > 0 ? (
+                                    [...productos].reverse().map(p => (
                                         <TouchableOpacity
                                             key={p.id}
                                             style={styles.modalItem}
@@ -386,18 +475,25 @@ const AddItemScreen: React.FC = () => {
                                                 )}
                                             </Text>
                                         </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                                <TouchableOpacity
-                                    style={styles.modalCloseButton}
-                                    onPress={() => setShowProductoSelector(false)}
-                                >
-                                    <Text style={styles.modalCloseButtonText}>Cerrar</Text>
-                                </TouchableOpacity>
-                            </View>
+                                    ))
+                                ) : (
+                                    <View style={styles.modalEmpty}>
+                                        <Text style={styles.modalEmptyText}>No hay productos disponibles</Text>
+                                        <Text style={styles.modalEmptySubtext}>
+                                            Agrega productos desde la configuración
+                                        </Text>
+                                    </View>
+                                )}
+                            </ScrollView>
+                            <TouchableOpacity
+                                style={styles.modalCloseButton}
+                                onPress={() => setShowProductoSelector(false)}
+                            >
+                                <Text style={styles.modalCloseButtonText}>Cerrar</Text>
+                            </TouchableOpacity>
                         </View>
-                    </Modal>
-                </View>
+                    </View>
+                </Modal>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -423,7 +519,7 @@ const styles = StyleSheet.create({
         padding: SPACING.lg,
     },
     title: {
-        fontSize: FONTS.heading,
+        fontSize: FONTS.title,
         fontWeight: 'bold',
         color: COLORS.text,
         marginBottom: SPACING.xl,
@@ -445,7 +541,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: COLORS.surface,
         borderWidth: 1,
         borderColor: COLORS.border,
         borderRadius: BORDER_RADIUS.lg,
@@ -491,7 +587,7 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
     input: {
-        backgroundColor: COLORS.cardBackground,
+        backgroundColor: COLORS.surface,
         borderWidth: 1,
         borderColor: COLORS.border,
         borderRadius: BORDER_RADIUS.lg,
@@ -538,12 +634,12 @@ const styles = StyleSheet.create({
         padding: SPACING.xl,
     },
     modalContent: {
-        backgroundColor: COLORS.cardBackground,
-        borderRadius: BORDER_RADIUS.xl,
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.lg,
         width: '100%',
         maxHeight: '80%',
-        ...SHADOWS.large,
+        ...SHADOWS.medium,
     },
     modalTitle: {
         fontSize: 18,
@@ -571,6 +667,48 @@ const styles = StyleSheet.create({
     },
     modalCloseButtonText: {
         color: COLORS.text,
+        fontWeight: '600',
+    },
+    modalEmpty: {
+        padding: SPACING.lg,
+        alignItems: 'center',
+    },
+    modalEmptyText: {
+        fontSize: FONTS.medium,
+        color: COLORS.textLight,
+        textAlign: 'center',
+        marginBottom: SPACING.sm,
+    },
+    modalEmptySubtext: {
+        fontSize: FONTS.small,
+        color: COLORS.textMuted,
+        textAlign: 'center',
+        fontStyle: 'italic',
+    },
+    errorText: {
+        fontSize: FONTS.large,
+        color: COLORS.error,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: SPACING.sm,
+    },
+    errorSubtext: {
+        fontSize: FONTS.medium,
+        color: COLORS.textLight,
+        textAlign: 'center',
+        marginBottom: SPACING.lg,
+        lineHeight: 20,
+    },
+    backButton: {
+        backgroundColor: COLORS.primary,
+        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.lg,
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+    backButtonText: {
+        color: 'white',
+        fontSize: FONTS.medium,
         fontWeight: '600',
     },
 });

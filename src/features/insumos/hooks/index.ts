@@ -1,0 +1,1 @@
+export { useInsumos } from './useInsumos';

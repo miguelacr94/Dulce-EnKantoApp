@@ -60,7 +60,6 @@ class NotificationService implements NotificationScheduler {
       
       // Solo programar si la notificación es en el futuro
       if (fechaNotificacion <= ahora) {
-        console.log(`La notificación para el pedido ${pedido.id} ya pasó o es muy pronto`);
         return;
       }
 
@@ -83,7 +82,6 @@ class NotificationService implements NotificationScheduler {
         },
       });
 
-      console.log(`Notificación programada para el pedido ${pedido.id} a las ${fechaNotificacion.toLocaleString()}`);
     } catch (error) {
       console.error('Error scheduling notification:', error);
     }

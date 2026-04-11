@@ -46,9 +46,6 @@ const PedidosScreen: React.FC = () => {
     );
   }
 
-
-  console.log('pedidosFiltrados', pedidosFiltrados);
-
   const getCount = (estado: EstadoPedido | 'todos') => {
     if (estado === 'todos') return pedidos.length;
     return pedidos.filter(p => p.estado === estado).length;

@@ -272,9 +272,13 @@ export class PedidosRepository implements IPedidosRepository {
 
     return (pedidos || []).reduce(
       (acc, pedido) => {
+        const totalAbonado =
+          pedido.abonos?.reduce((sum, abono) => sum + abono.monto, 0) || 0;
+
         switch (pedido.estado) {
           case 'pendiente':
             acc.pendientes++;
+            acc.totalPendienteCobrar += pedido.precio_total - totalAbonado;
             break;
           case 'entregado':
             acc.entregados++;
@@ -284,10 +288,9 @@ export class PedidosRepository implements IPedidosRepository {
             break;
         }
 
-        if (pedido.estado === 'pendiente') {
-          const totalAbonado =
-            pedido.abonos?.reduce((sum, abono) => sum + abono.monto, 0) || 0;
-          acc.totalPendienteCobrar += pedido.precio_total - totalAbonado;
+        // Solo sumamos ingresos de pedidos que no estén cancelados
+        if (pedido.estado !== 'cancelado') {
+          acc.totalIngresosReal += totalAbonado;
         }
 
         return acc;
@@ -297,6 +300,7 @@ export class PedidosRepository implements IPedidosRepository {
         entregados: 0,
         cancelados: 0,
         totalPendienteCobrar: 0,
+        totalIngresosReal: 0,
       }
     );
   }
@@ -333,8 +337,6 @@ export class PedidosRepository implements IPedidosRepository {
         tamano_id: item.tamano_id === '' ? null : item.tamano_id,
       }));
 
-      console.log('=== INSERTANDO ITEMS EN PEDIDOS_ITEMS ===');
-      console.log('Items a insertar:', JSON.stringify(itemsConPedidoId, null, 2));
 
       const { error: errorItems } = await supabase
         .from(this.itemsTableName)
@@ -344,7 +346,6 @@ export class PedidosRepository implements IPedidosRepository {
         console.error('Error detallado al insertar items:', errorItems);
         throw new PedidoRepositoryError('Error al insertar nuevos items', errorItems);
       } else {
-        console.log('✅ Items insertados correctamente');
       }
     } catch (error) {
       console.error('Error en actualización de items:', error);

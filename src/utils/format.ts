@@ -92,17 +92,11 @@ export const horasDeAtraso = (fechaEntrega: string): number => {
   // La fecha de entrega viene en UTC, pero new Date() la convierte automáticamente a local
   // No necesitamos conversión manual, JavaScript ya maneja la zona horaria
   
-  console.log(`Hora actual local: ${now.toISOString()}`);
-  console.log(`Fecha entrega UTC: ${entrega.toISOString()}`);
-  console.log(`Fecha entrega interpretada como local: ${new Date(fechaEntrega).toISOString()}`);
-  
   // Si no está vencido, retornar 0
   if (entrega >= now) return 0;
   
   const diffMs = now.getTime() - entrega.getTime();
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  
-  console.log(`Diferencia en horas: ${diffHours}`);
   
   return diffHours;
 };

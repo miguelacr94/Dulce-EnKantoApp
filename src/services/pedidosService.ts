@@ -1,4 +1,4 @@
-import { supabase } from '@/services';
+import { supabase } from './supabase';
 import { Pedido, PedidoConDetalles, EstadoPedido, PedidoItem } from '@/types';
 import { formatDateTimeForDB } from '@/utils';
 
@@ -135,7 +135,15 @@ export const pedidosService = {
           tamano:tamanos (
             id,
             nombre,
-            tipo
+            tipo,
+            insumos_relacionados:insumo_tamanos (
+              cantidad,
+              insumo (
+                id,
+                nombre,
+                medida
+              )
+            )
           )
         )
       `,
@@ -145,7 +153,20 @@ export const pedidosService = {
 
     if (error) throw error;
 
-    return this.calcularTotales(data);
+    // Procesar los datos para aplanar arrays de un solo elemento (común en Supabase)
+    const pedido = data;
+    if (pedido.items) {
+      pedido.items.forEach((item: any) => {
+        if (item.tamano?.insumos_relacionados) {
+          item.tamano.insumos_relacionados = item.tamano.insumos_relacionados.map((ir: any) => ({
+            ...ir,
+            insumo: Array.isArray(ir.insumo) ? ir.insumo[0] : ir.insumo
+          }));
+        }
+      });
+    }
+
+    return this.calcularTotales(pedido);
   },
 
   // Crear un nuevo pedido con items
@@ -224,8 +245,6 @@ export const pedidosService = {
           item.producto_id.trim() !== ''
         );
 
-        console.log("Items recibidos:", items);
-        console.log("Items válidos después de filtrar:", validItems);
 
         if (validItems.length === 0) {
           console.warn("No hay items válidos para insertar");
@@ -244,11 +263,9 @@ export const pedidosService = {
             throw new Error(`Item ${index} tiene producto_id inválido: "${itemForDb.producto_id}"`);
           }
           
-          console.log(`Item ${index} para BD:`, itemForDb);
           return itemForDb;
         });
 
-        console.log("Items finales a insertar:", itemsConPedidoId);
 
         const { error: errorItems } = await supabase
           .from("pedidos_items")

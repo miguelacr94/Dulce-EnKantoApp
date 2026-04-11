@@ -28,6 +28,11 @@ const GestionProductosScreen: React.FC = () => {
 
             setModalVisible(false);
             setEditingProducto(null);
+            setFormData({
+                nombre: '',
+                descripcion: '',
+                tipo_medida: undefined,
+            });
         } catch (e) {
             // Error al guardar producto
             Alert.alert('Error', 'No se pudo guardar el producto');

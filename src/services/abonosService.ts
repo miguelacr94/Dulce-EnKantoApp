@@ -1,4 +1,4 @@
-import { supabase } from '@/services';
+import { supabase } from './supabase';
 import { Abono } from '@/types';
 import { formatDateForDB } from '@/utils';
 
@@ -81,5 +81,15 @@ export const abonosService = {
     if (errorPedido) throw errorPedido;
 
     return (totalActual + nuevoMonto) <= pedido.precio_total;
+  },
+
+  // Obtener la suma total de todos los abonos del sistema
+  async getTotalSum(): Promise<number> {
+    const { data, error } = await supabase
+      .from('abonos')
+      .select('monto');
+
+    if (error) throw error;
+    return (data || []).reduce((sum, item) => sum + Number(item.monto), 0);
   }
 };

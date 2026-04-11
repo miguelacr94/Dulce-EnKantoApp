@@ -10,21 +10,17 @@ interface PedidoHeaderProps {
 
 const PedidoHeader: React.FC<PedidoHeaderProps> = ({ pedido, vencido }) => {
   const textoAtraso = getTextoHorasAtraso(pedido.fecha_entrega);
-  
+
   // Logging temporal para verificar el cálculo
   if (vencido && textoAtraso) {
     const horaLocal = getHoraLocal(pedido.fecha_entrega);
-    console.log(`Pedido ${pedido.id}: ${textoAtraso}`);
-    console.log(`  - Fecha entrega UTC: ${pedido.fecha_entrega}`);
-    console.log(`  - Hora entrega local: ${horaLocal}`);
-    console.log(`  - Estado: ${vencido ? 'VENCIDO' : 'A TIEMPO'}`);
   }
-  
+
   return (
     <View style={styles.pedidoHeader}>
       <View style={styles.clienteInfo}>
         <Text style={[
-          styles.clienteNombre, 
+          styles.clienteNombre,
           vencido && styles.textoVencido
         ]}>
           {pedido.cliente_nombre || 'Sin nombre'}
@@ -35,7 +31,7 @@ const PedidoHeader: React.FC<PedidoHeaderProps> = ({ pedido, vencido }) => {
         ]}>
           {pedido.cliente_telefono || 'Sin teléfono'}
         </Text>
-        
+
         {/* Indicador de domicilio */}
         <View style={styles.domicilioRow}>
           <View style={[
@@ -77,7 +73,7 @@ const PedidoHeader: React.FC<PedidoHeaderProps> = ({ pedido, vencido }) => {
             styles.saldoAbonado,
             vencido && styles.textoVencido
           ]}>
-           Abonado: {formatCurrency(pedido.total_abonado)}
+            Abonado: {formatCurrency(pedido.total_abonado)}
           </Text>
         )}
         {pedido.saldo_pendiente > 0 && (

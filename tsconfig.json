@@ -4,11 +4,21 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/app/*": ["src/app/*"],
-      "@/features/*": ["src/features/*"],
-      "@/shared/*": ["src/shared/*"],
-      "@/assets/*": ["src/assets/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "@/app/*": [
+        "src/app/*"
+      ],
+      "@/features/*": [
+        "src/features/*"
+      ],
+      "@/shared/*": [
+        "src/shared/*"
+      ],
+      "@/assets/*": [
+        "src/assets/*"
+      ]
     },
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,5 +26,10 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*", "App.js", "index.js"]
+  "include": [
+    "src/**/*",
+    "App.js",
+    "index.js",
+    "nativewind-env.d.ts"
+  ]
 }

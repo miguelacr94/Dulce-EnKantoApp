@@ -7,11 +7,14 @@ import { Text } from 'react-native';
 // Importar pantallas desde features (Arquitectura SOLID)
 import { DashboardScreen, PedidosScreen, CrearPedidoScreen, PedidoDetalleScreen, EditarPedidoScreen, AddItemScreen } from '@/features/pedidos/screens';
 import { CrearPedidoItemDTO } from '@/features/pedidos/types';
+import { GastosScreen, CrearGastoScreen, EditarGastoScreen } from '@/features/gastos/screens';
 
 
 import { ConfiguracionScreen } from '@/features/configuracion/screens';
 
 import { GestionProductosScreen, GestionSaboresScreen, GestionTamanosScreen } from '@/features/productos/screens';
+import { GestionInsumosScreen, CrearInsumoScreen, EditarStockScreen } from '@/features/insumos';
+import SplashScreen from '@/shared/screens/SplashScreen';
 
 // Tipos de navegación
 export type RootStackParamList = {
@@ -23,12 +26,19 @@ export type RootStackParamList = {
   GestionProductos: undefined;
   GestionSabores: undefined;
   GestionTamanos: undefined;
+  GestionInsumos: undefined;
+  CrearInsumo: { editingInsumo?: any };
+  EditarStock: { insumo: import('@/features/insumos/types').Insumo };
   AddItem: { initialItem?: CrearPedidoItemDTO; editingIndex?: number; returnTo: 'CrearPedido' | 'EditarPedido'; pedidoId?: string };
+  CrearGasto: undefined;
+  EditarGasto: { gastoId: string };
+  Splash: undefined;
 };
 
 export type TabParamList = {
   Dashboard: undefined;
   Pedidos: undefined;
+  Gastos: undefined;
   Configuracion: undefined;
 };
 
@@ -37,6 +47,8 @@ export type NavigationParamList = RootStackParamList & TabParamList;
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
+
+import { COLORS, SHADOWS, FONTS, BORDER_RADIUS } from '@/utils/constants';
 
 // Componentes de iconos para las tabs
 const HomeIcon = ({ color, size }: { color: string; size: number }) => (
@@ -47,53 +59,104 @@ const PedidosIcon = ({ color, size }: { color: string; size: number }) => (
   <Text style={{ color, fontSize: size }}>📋</Text>
 );
 
+const GastosIcon = ({ color, size }: { color: string; size: number }) => (
+  <Text style={{ color, fontSize: size }}>📉</Text>
+);
+
 const ConfigIcon = ({ color, size }: { color: string; size: number }) => (
   <Text style={{ color, fontSize: size }}>⚙️</Text>
 );
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 // Componente para las tabs principales
 const MainTabs = () => {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tab.Navigator
       id="main-tabs"
-      screenOptions={{
-        tabBarActiveTintColor: '#FF69B4', // Rosa pastel
-        tabBarInactiveTintColor: '#999',
+      screenOptions={({ route }) => ({
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarLabelStyle: {
+          fontWeight: '800',
+          fontSize: 11,
+          marginBottom: 4,
+        },
         tabBarStyle: {
-          backgroundColor: '#FFF5F5', // Rosa muy claro
-          borderTopColor: '#FFB6C1', // Rosa claro
+          backgroundColor: COLORS.surface,
+          height: 60 + insets.bottom,
+          paddingTop: 10,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          borderTopWidth: 1,
+          borderTopColor: COLORS.border,
+          ...SHADOWS.soft,
         },
         headerStyle: {
-          backgroundColor: '#FFB6C1',
+          backgroundColor: COLORS.primary, // Header Rosa
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
-        headerTintColor: '#fff',
+        headerTintColor: '#FFFFFF', // Texto Blanco
         headerTitleStyle: {
           fontWeight: 'bold',
+          fontSize: 18,
         },
-      }}
+        tabBarItemStyle: {
+          borderRadius: 12,
+          marginHorizontal: 8,
+          marginVertical: 4,
+          height: 44,
+        },
+        tabBarActiveBackgroundColor: 'transparent',
+      })}
     >
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
         options={{
           tabBarLabel: 'Inicio',
-          tabBarIcon: HomeIcon,
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22, color: focused ? COLORS.primary : COLORS.textMuted }}>🏠</Text>
+          ),
+          headerShown: false, // El Dashboard maneja su propio header rosa con SafeArea
         }}
       />
       <Tab.Screen
         name="Pedidos"
         component={PedidosScreen}
         options={{
-          tabBarLabel: 'Pedidos',
-          tabBarIcon: PedidosIcon,
+          tabBarLabel: 'Ventas',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22, color: focused ? COLORS.primary : COLORS.textMuted }}>📋</Text>
+          ),
+          title: 'Ventas',
+        }}
+      />
+      <Tab.Screen
+        name="Gastos"
+        component={GastosScreen}
+        options={{
+          tabBarLabel: 'Gastos',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22, color: focused ? COLORS.primary : COLORS.textMuted }}>📉</Text>
+          ),
+          title: 'Gastos',
         }}
       />
       <Tab.Screen
         name="Configuracion"
         component={ConfiguracionScreen}
         options={{
-          tabBarLabel: 'Config',
-          tabBarIcon: ConfigIcon,
+          tabBarLabel: 'Ajustes',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 22, color: focused ? COLORS.primary : COLORS.textMuted }}>⚙️</Text>
+          ),
+          title: 'Ajustes',
         }}
       />
     </Tab.Navigator>
@@ -107,14 +170,25 @@ const AppNavigator = () => {
       id="root-stack"
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#FFB6C1',
+          backgroundColor: COLORS.primary, // Header Rosa en Stack
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
-        headerTintColor: '#fff',
+        headerTintColor: '#FFFFFF', // Texto Blanco en Stack
         headerTitleStyle: {
           fontWeight: 'bold',
+          fontSize: 18,
         },
       }}
     >
+      <Stack.Screen
+        name="Splash"
+        component={SplashScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name="MainTabs"
         component={MainTabs}
@@ -151,9 +225,34 @@ const AppNavigator = () => {
         options={{ title: 'Gestionar Tamaños' }}
       />
       <Stack.Screen
+        name="GestionInsumos"
+        component={GestionInsumosScreen}
+        options={{ title: 'Gestionar Insumos' }}
+      />
+      <Stack.Screen
+        name="CrearInsumo"
+        component={CrearInsumoScreen}
+        options={{ title: 'Crear Insumo' }}
+      />
+      <Stack.Screen
+        name="EditarStock"
+        component={EditarStockScreen}
+        options={{ title: 'Editar Stock' }}
+      />
+      <Stack.Screen
         name="AddItem"
         component={AddItemScreen}
         options={{ title: 'Agregar Item' }}
+      />
+      <Stack.Screen
+        name="CrearGasto"
+        component={CrearGastoScreen}
+        options={{ title: 'Registrar Gasto' }}
+      />
+      <Stack.Screen
+        name="EditarGasto"
+        component={EditarGastoScreen}
+        options={{ title: 'Editar Gasto' }}
       />
     </Stack.Navigator>
   );

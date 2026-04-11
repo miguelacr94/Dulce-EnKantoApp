@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -17,6 +18,8 @@ import { usePedidos, type PedidoConDetalles, type Abono, type EstadoPedido } fro
 import { useAbonos } from '@/features/pedidos/hooks';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '@/utils';
 import { formatCurrency, formatDateTime, formatDateForDB, getEstadoColor, getProductoLabel } from '@/utils';
+import { useInsumos } from '@/features/insumos/hooks/useInsumos';
+import { insumosService } from '@/services/insumosService';
 
 type PedidoDetalleScreenRouteProp = RouteProp<RootStackParamList, 'PedidoDetalle'>;
 type PedidoDetalleScreenNavigationProp = StackNavigationProp<RootStackParamList, 'PedidoDetalle'>;
@@ -26,14 +29,17 @@ const PedidoDetalleScreen: React.FC = () => {
   const navigation = useNavigation<PedidoDetalleScreenNavigationProp>();
   const { pedidoId } = route.params;
 
-  const { getPedidoById, cambiarEstado, updatePedido, isChangingEstado, isUpdating } = usePedidos();
-  const { abonos, createAbono, deleteAbono, isCreating, isDeleting } = useAbonos(pedidoId);
+  const { getPedidoById, cambiarEstado, updatePedido, deletePedido, isChangingEstado, isUpdating, isDeleting: isDeletingPedido } = usePedidos();
+  const { abonos, createAbono, deleteAbono, isCreating, isDeleting: isDeletingAbono } = useAbonos(pedidoId);
+  const { insumos, loadInsumos } = useInsumos();
 
   const [showAbonoModal, setShowAbonoModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEstado, setSelectedEstado] = useState<EstadoPedido | null>(null);
   const [nuevoAbono, setNuevoAbono] = useState('');
   const [pedidoActual, setPedidoActual] = useState<PedidoConDetalles | null>(null);
+  const [checkedInsumos, setCheckedInsumos] = useState<Record<string, boolean>>({});
 
   // Cargar el pedido al montar el componente
   useEffect(() => {
@@ -42,7 +48,33 @@ const PedidoDetalleScreen: React.FC = () => {
       setPedidoActual(pedido);
     };
     loadPedido();
-  }, [pedidoId, getPedidoById]);
+    loadInsumos();
+  }, [pedidoId, getPedidoById, loadInsumos]);
+
+  // Helper local para cruzar datos de inventario
+  const getInsumosParaItem = (item: any) => {
+    const tId = item.tamano_id || item.tamano?.id;
+    if (!tId) return [];
+    
+    return insumos.flatMap(insumo => 
+      (insumo.insumo_tamanos || [])
+        .filter(it => it.tamano_id === tId)
+        .map(it => ({
+          id: it.id,
+          insumoId: insumo.id,
+          nombre: insumo.nombre,
+          cantidad: it.cantidad
+        }))
+    );
+  };
+
+  const toggleInsumo = (itemId: string | number, insumoId: string | number) => {
+    const key = `${itemId}_${insumoId}`;
+    setCheckedInsumos(prev => ({
+      ...prev,
+      [key]: prev[key] === undefined ? false : !prev[key]
+    }));
+  };
 
   // Si no hay pedido actual, mostrar mensaje de carga
   if (!pedidoActual) {
@@ -62,6 +94,16 @@ const PedidoDetalleScreen: React.FC = () => {
     if (!selectedEstado || !pedidoActual) return;
 
     try {
+      // Si el estado cambia a entregado, descontamos el stock primero
+      if (selectedEstado === 'entregado' && pedidoActual.items) {
+        try {
+          await insumosService.descontarStockPorPedido(pedidoActual.items, checkedInsumos);
+        } catch (stockError) {
+          console.error('Error descontando stock:', stockError);
+          Alert.alert('Advertencia', 'El pedido se actualizará pero hubo un error al descontar el inventario.');
+        }
+      }
+
       await cambiarEstado(pedidoActual.id, selectedEstado);
       const updatedPedido = await getPedidoById(pedidoId);
       setPedidoActual(updatedPedido);
@@ -124,16 +166,98 @@ const PedidoDetalleScreen: React.FC = () => {
 
   const handleEditarPedido = () => {
     if (!pedidoActual) return;
-    
+
     // Solo permitir editar pedidos pendientes
     if (pedidoActual.estado !== 'pendiente') {
       Alert.alert('No se puede editar', 'Solo se pueden editar pedidos en estado "pendiente"');
       return;
     }
-    
+
     navigation.navigate('EditarPedido', { pedidoId: pedidoActual.id });
   };
 
+  const handleEliminarPedido = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmarEliminacion = async () => {
+    try {
+      await deletePedido(pedidoId);
+      setShowDeleteModal(false);
+      Alert.alert('Éxito', 'Pedido eliminado correctamente');
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo eliminar el pedido');
+    }
+  };
+
+
+  const renderDeleteModal = () => (
+    <Modal
+      visible={showDeleteModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowDeleteModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.deleteModalContent}>
+          {/* Icono de advertencia */}
+          <View style={styles.deleteIconContainer}>
+            <Text style={styles.deleteIcon}>⚠️</Text>
+          </View>
+
+          <Text style={styles.deleteModalTitle}>Eliminar Pedido</Text>
+
+          <Text style={styles.deleteModalText}>
+            ¿Estás seguro de que quieres eliminar este pedido?
+          </Text>
+
+          {/* Detalles del pedido a eliminar */}
+          <View style={styles.deletePedidoDetails}>
+            <Text style={styles.deleteDetailLabel}>Cliente:</Text>
+            <Text style={styles.deleteDetailValue}>{pedidoActual?.cliente_nombre || 'Sin nombre'}</Text>
+
+            <Text style={styles.deleteDetailLabel}>Valor Total:</Text>
+            <Text style={styles.deleteDetailValue}>{formatCurrency(pedidoActual?.precio_total || 0)}</Text>
+
+            <Text style={styles.deleteDetailLabel}>Estado:</Text>
+            <Text style={styles.deleteDetailValue}>{pedidoActual?.estado || 'Sin estado'}</Text>
+          </View>
+
+          <View style={styles.deleteWarningBox}>
+            <Text style={styles.deleteWarningText}>
+              Esta acción no se puede deshacer y eliminará permanentemente el pedido y toda su información asociada.
+            </Text>
+          </View>
+
+          {/* Botones de acción */}
+          <View style={styles.deleteModalActions}>
+            <TouchableOpacity
+              style={[styles.deleteModalButton, styles.deleteCancelButton]}
+              onPress={() => setShowDeleteModal(false)}
+              disabled={isDeletingPedido}
+            >
+              <Text style={styles.deleteCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.deleteModalButton, styles.deleteConfirmButton]}
+              onPress={handleConfirmarEliminacion}
+              disabled={isDeletingPedido}
+            >
+              {isDeletingPedido ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.deleteConfirmText}>Eliminando...</Text>
+                </View>
+              ) : (
+                <Text style={styles.deleteConfirmText}>Eliminar Pedido</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const renderConfirmModal = () => (
     <Modal
@@ -308,6 +432,38 @@ const PedidoDetalleScreen: React.FC = () => {
                 </View>
               )}
 
+              {/* Indicadores de Insumos/Suministros con Switch */}
+              {getInsumosParaItem(item).length > 0 && (
+                <View style={styles.inventoryCheckContainer}>
+                  <Text style={styles.inventoryCheckTitle}>Confirmar insumos para este tamaño:</Text>
+                  <View style={styles.inventorySwitchList}>
+                    {getInsumosParaItem(item).map((insumo) => {
+                      const key = `${item.id}_${insumo.insumoId}`;
+                      const isChecked = checkedInsumos[key] !== false;
+                      
+                      return (
+                        <View key={insumo.id} style={styles.inventorySwitchItem}>
+                          <View style={styles.inventorySwitchLabel}>
+                            <Text style={[
+                              styles.inventoryBadgeText,
+                              insumo.cantidad <= 0 && styles.noStockText
+                            ]}>
+                              {insumo.cantidad > 0 ? '✅' : '⚠️'} Descartar {insumo.nombre}: {insumo.cantidad}
+                            </Text>
+                          </View>
+                          <Switch
+                            trackColor={{ false: '#767577', true: COLORS.primary + '80' }}
+                            thumbColor={isChecked ? COLORS.primary : '#f4f3f4'}
+                            onValueChange={() => toggleInsumo(item.id, insumo.insumoId)}
+                            value={isChecked}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               {index < (pedidoActual.items?.length ?? 0) - 1 && (
                 <View style={styles.itemSeparator} />
               )}
@@ -381,7 +537,7 @@ const PedidoDetalleScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.deleteAbonoButton}
                 onPress={() => handleEliminarAbono(abono)}
-                disabled={isDeleting}
+                disabled={isDeletingAbono}
               >
                 <Text style={styles.deleteAbonoText}>🗑️</Text>
               </TouchableOpacity>
@@ -394,44 +550,53 @@ const PedidoDetalleScreen: React.FC = () => {
 
       {/* Acciones */}
       <View style={styles.actionsContainer}>
-        {/* Edit button - only for pending orders */}
-        {pedidoActual.estado === 'pendiente' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editarButton]}
-            onPress={handleEditarPedido}
-            disabled={isUpdating}
-          >
-            <Text style={styles.actionButtonText}>
-              ✏️ Editar Pedido
-            </Text>
-          </TouchableOpacity>
-        )}
-
+        {/* Botones para pedidos pendientes */}
         {pedidoActual.estado === 'pendiente' && (
           <>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.entregarButton,
-                pedidoActual.saldo_pendiente > 0 && styles.buttonDisabled
-              ]}
-              onPress={() => handleConfirmarEstado('entregado')}
-              disabled={pedidoActual.saldo_pendiente > 0}
-            >
-              <Text style={styles.actionButtonText}>
-                {pedidoActual.saldo_pendiente > 0 ? '🔒 Saldo Pendiente' : '✅ Marcar como Entregado'}
-              </Text>
-            </TouchableOpacity>
+            {/* Fila 1: Editar y Eliminar */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.editarButton, styles.actionButtonHalf]}
+                onPress={handleEditarPedido}
+                disabled={isUpdating}
+              >
+                <Text style={styles.actionButtonText}>
+                  ✏️ Editar
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelarButton]}
-              onPress={() => handleConfirmarEstado('cancelado')}
-            >
-              <Text style={styles.actionButtonText}>❌ Cancelar Pedido</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.eliminarButton, styles.actionButtonHalf]}
+                onPress={handleEliminarPedido}
+                disabled={isDeletingPedido}
+              >
+                <Text style={styles.actionButtonText}>
+                  {isDeletingPedido ? '🗑️ Eliminando...' : '🗑️ Eliminar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Fila 2: Entregar */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.entregarButton,
+                  styles.actionButtonFull,
+                  pedidoActual.saldo_pendiente > 0 && styles.buttonDisabled
+                ]}
+                onPress={() => handleConfirmarEstado('entregado')}
+                disabled={pedidoActual.saldo_pendiente > 0}
+              >
+                <Text style={styles.actionButtonText}>
+                  {pedidoActual.saldo_pendiente > 0 ? '🔒 Saldo Pendiente' : '✅ Entregar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
+        {/* Botón para pedidos cancelados */}
         {pedidoActual.estado === 'cancelado' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.reactivarButton]}
@@ -441,6 +606,7 @@ const PedidoDetalleScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
+        {/* Botón para pedidos entregados */}
         {pedidoActual.estado === 'entregado' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.reactivarButton]}
@@ -453,6 +619,7 @@ const PedidoDetalleScreen: React.FC = () => {
 
       {renderConfirmModal()}
       {renderAbonoModal()}
+      {renderDeleteModal()}
     </ScrollView>
   );
 };
@@ -472,7 +639,7 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
   },
   headerCard: {
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: COLORS.surface,
     padding: SPACING.lg,
     margin: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
@@ -493,7 +660,7 @@ const styles = StyleSheet.create({
   estadoBadge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
   },
   estadoText: {
     fontSize: FONTS.small,
@@ -524,7 +691,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   card: {
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: COLORS.surface,
     padding: SPACING.lg,
     margin: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
@@ -572,7 +739,7 @@ const styles = StyleSheet.create({
   addAbonoButton: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: COLORS.primary + '20',
   },
   addAbonoText: {
@@ -603,7 +770,7 @@ const styles = StyleSheet.create({
   },
   deleteAbonoButton: {
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     backgroundColor: '#FFE4E1',
   },
   deleteAbonoText: {
@@ -619,17 +786,33 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     gap: SPACING.sm,
   },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+  },
   actionButton: {
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
+    minHeight: 50,
+    justifyContent: 'center',
     ...SHADOWS.medium,
+  },
+  actionButtonHalf: {
+    flex: 1,
+  },
+  actionButtonFull: {
+    flex: 1,
   },
   entregarButton: {
     backgroundColor: COLORS.success,
   },
   cancelarButton: {
     backgroundColor: COLORS.error,
+  },
+  eliminarButton: {
+    backgroundColor: '#DC143C', // Rojo más intenso para eliminar
   },
   reactivarButton: {
     backgroundColor: COLORS.warning,
@@ -653,11 +836,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
     width: '90%',
     padding: SPACING.lg,
-    ...SHADOWS.large,
+    ...SHADOWS.medium,
   },
   modalTitle: {
     fontSize: FONTS.large,
@@ -687,6 +870,64 @@ const styles = StyleSheet.create({
   modalInputMultiline: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  inventoryCheckContainer: {
+    marginTop: 10,
+    backgroundColor: '#F9FAFB',
+    padding: 10,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  inventoryCheckTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.textLight,
+    marginBottom: 6,
+  },
+  inventoryBadgesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  inventorySwitchList: {
+    gap: 8,
+  },
+  inventorySwitchItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  inventorySwitchLabel: {
+    flex: 1,
+  },
+  inventoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  noStockText: {
+    color: COLORS.error,
+    fontWeight: 'bold',
+  },
+  hasStockBadge: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#C8E6C9',
+  },
+  lowStockBadge: {
+    backgroundColor: '#FFFDE7',
+    borderColor: '#FFF59D',
+  },
+  noStockBadge: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#FFCDD2',
+  },
+  inventoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.text,
   },
   modalHelper: {
     fontSize: FONTS.small,
@@ -743,6 +984,99 @@ const styles = StyleSheet.create({
   modalSubmitText: {
     fontSize: FONTS.medium,
     fontWeight: '600',
+    color: COLORS.textWhite,
+  },
+  // Estilos para el modal de eliminar pedido
+  deleteModalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    width: '90%',
+    maxWidth: 400,
+    padding: SPACING.xl,
+    ...SHADOWS.medium,
+  },
+  deleteIconContainer: {
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  deleteIcon: {
+    fontSize: 48,
+  },
+  deleteModalTitle: {
+    fontSize: FONTS.xlarge,
+    fontWeight: 'bold',
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  deleteModalText: {
+    fontSize: FONTS.medium,
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+    lineHeight: 22,
+  },
+  deletePedidoDetails: {
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  deleteDetailLabel: {
+    fontSize: FONTS.small,
+    color: COLORS.textLight,
+    marginBottom: 2,
+  },
+  deleteDetailValue: {
+    fontSize: FONTS.medium,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  deleteWarningBox: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFEAA7',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  deleteWarningText: {
+    fontSize: FONTS.small,
+    color: '#856404',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  deleteModalButton: {
+    flex: 1,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    minHeight: 50,
+    justifyContent: 'center',
+  },
+  deleteCancelButton: {
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  deleteCancelText: {
+    fontSize: FONTS.medium,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  deleteConfirmButton: {
+    backgroundColor: COLORS.error,
+    ...SHADOWS.medium,
+  },
+  deleteConfirmText: {
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
     color: COLORS.textWhite,
   },
 });

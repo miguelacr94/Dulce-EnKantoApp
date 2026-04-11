@@ -195,24 +195,8 @@ const CrearPedidoScreen: React.FC = () => {
     removeCrearItem(index);
   };
 
-  // Escuchar cuando volvemos de AddItem con un nuevo item
-  useEffect(() => {
-    const routeParams = route.params as any;
-    if (routeParams?.newItem) {
-      const { newItem, editingIndex } = routeParams;
-
-      if (editingIndex !== undefined && editingIndex !== null) {
-        // Estamos editando un item existente
-        updateCrearItem(editingIndex, newItem);
-      } else {
-        // Estamos agregando un nuevo item
-        addCrearItem(newItem);
-      }
-
-      // Limpiar los parámetros
-      navigation.setParams({ newItem: undefined, editingIndex: undefined } as any);
-    }
-  }, [route.params, updateCrearItem, addCrearItem, navigation]);
+  // El store de Zustand (useItemsStore) ahora se actualiza directamente desde AddItemScreen
+  // por lo que no es necesario escuchar parámetros de la ruta aquí.
 
   const handleSelectProducto = (producto: Producto) => {
     setTempItem((prev: CrearPedidoItemDTO) => ({
@@ -252,7 +236,7 @@ const CrearPedidoScreen: React.FC = () => {
             productos={productos}
             sabores={sabores}
             onEditItem={handleEditItem}
-            onRemoveItem={handleRemoveItemFromForm}
+            onRemoveItem={handleRemoveItem}
             onAddItem={handleOpenItemModal}
           />
 
@@ -279,21 +263,6 @@ const CrearPedidoScreen: React.FC = () => {
           <View style={styles.actionsContainer}>
             <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
               <Text>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.clearButton} 
-              onPress={() => {
-                Alert.alert(
-                  'Limpiar Formulario', 
-                  '¿Estás seguro de que quieres limpiar todos los datos del formulario?',
-                  [
-                    { text: 'No', style: 'cancel' },
-                    { text: 'Sí', onPress: () => resetForm() }
-                  ]
-                );
-              }}
-            >
-              <Text style={styles.clearButtonText}>Limpiar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isCreating || isSubmitting}>
               <Text style={{ color: 'white' }}>{isCreating || isSubmitting ? 'Creando...' : 'Crear Pedido'}</Text>
@@ -352,21 +321,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  clearButton: {
-    flex: 1,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center' as const,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    backgroundColor: 'transparent',
-  },
-  clearButtonText: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
   submitButton: {
-    flex: 1.5,
+    flex: 2,
     backgroundColor: COLORS.primary,
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,

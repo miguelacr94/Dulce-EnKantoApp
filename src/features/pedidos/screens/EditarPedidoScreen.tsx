@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end' as const,
   },
   bottomSheet: {
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: BORDER_RADIUS.xl,
     borderTopRightRadius: BORDER_RADIUS.xl,
     padding: SPACING.lg,
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const,
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: BORDER_RADIUS.lg,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   input: {
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: BORDER_RADIUS.lg,
@@ -234,6 +234,64 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '600',
   },
+  // Estilos para lista de productos directa
+  productosListContainer: {
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    maxHeight: 200,
+  },
+  productosListTitle: {
+    fontSize: FONTS.small,
+    fontWeight: '600',
+    color: COLORS.textLight,
+  },
+  productosListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+  },
+  productoSeleccionadoText: {
+    fontSize: FONTS.small,
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  productosScrollView: {
+    maxHeight: 150,
+  },
+  productoItem: {
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.xs,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  productoItemSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  productoItemText: {
+    fontSize: FONTS.medium,
+    color: COLORS.text,
+  },
+  productoItemTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  productosEmpty: {
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  productosEmptyText: {
+    fontSize: FONTS.small,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
 });
 
 type EditarPedidoScreenRouteProp = RouteProp<RootStackParamList, 'EditarPedido'>;
@@ -247,14 +305,15 @@ const EditarPedidoScreen: React.FC = () => {
 
   const { updatePedido, getPedidoById, isUpdating } = usePedidos();
   const { productos, sabores, tamanos, isLoading: isLoadingMetadata } = useMetadata();
-  
-  // Estado local simple para items
-  const [items, setItems] = useState<CrearPedidoItemDTO[]>([]);
 
-  // Store global (solo para el submit final)
-  const { 
-    editarItems, 
-    setEditarItems
+
+  const [productosListExpanded, setProductosListExpanded] = useState(true);
+
+  // Store global de items para edición
+  const {
+    editarItems,
+    setEditarItems,
+    removeEditarItem
   } = useItemsStore();
 
   // Estado local para forzar re-render
@@ -303,65 +362,39 @@ const EditarPedidoScreen: React.FC = () => {
   const [isItemsLoading, setIsItemsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Estado para el modal de edición de items
-  const [showItemModal, setShowItemModal] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [tempItem, setTempItem] = useState<CrearPedidoItemDTO | null>(null);
+  // La edición de items ahora se maneja en AddItemScreen
 
   // Función debounced para prevenir múltiples ejecuciones
   const debouncedSubmit = debounce(async () => {
-    console.log('Validando items...', items);
-    
-    console.log('=== DEBUG CONDICIONES ===');
-    console.log('isSubmitting:', isSubmitting);
-    console.log('isUpdating:', isUpdating);
-    console.log('isItemsLoading:', isItemsLoading);
-    console.log('validateFormLocal():', validateFormLocal());
-    console.log('pedidoActual:', !!pedidoActual);
-    console.log('========================');
-      
+
     if (isSubmitting || isUpdating || isItemsLoading) {
-      console.log('SALIÓ POR: isSubmitting || isUpdating || isItemsLoading');
       if (isItemsLoading) {
         Alert.alert('Espere', 'Los productos están cargando...');
       }
       return;
     }
     if (!validateFormLocal()) {
-      console.log('SALIÓ POR: !validateFormLocal()');
       return;
     }
     if (!pedidoActual) {
-      console.log('SALIÓ POR: !pedidoActual');
       return;
     }
 
-    console.log('PASÓ TODAS LAS VALIDACIONES INICIALES');
 
     setIsSubmitting(true);
     try {
       // Debug: Mostrar estado actual de items
-      console.log('=== DEBUG DETALLADO ===');
-      console.log('items:', items);
-      console.log('typeof items:', typeof items);
-      console.log('Array.isArray(items):', Array.isArray(items));
-      console.log('items.length:', items.length);
-      console.log('items.length type:', typeof items.length);
-      console.log('JSON.stringify(items):', JSON.stringify(items));
-      console.log('========================');
 
       // Validar que haya items
-      console.log('ANTES DE VALIDAR - items.length:', items.length);
-      if (items.length === 0) {
-        console.log('ENTRÓ A LA VALIDACIÓN DE CARRITO VACÍO');
+      // Validar que haya items
+      if (editarItems.length === 0) {
         setIsSubmitting(false);
         Alert.alert('Error', 'El carrito está vacío. Agregue items antes de guardar.');
         return;
       }
-      console.log('PASÓ LA VALIDACIÓN - items.length:', items.length);
 
       // Determinamos el tipo de producto general basado en el primer item
-      const firstProduct = productos.find(p => p.id === items[0]?.producto_id);
+      const firstProduct = productos.find(p => p.id === editarItems[0]?.producto_id);
 
 
 
@@ -370,7 +403,7 @@ const EditarPedidoScreen: React.FC = () => {
         cliente_telefono: clienteTelefono,
         tipo_producto: 'torta', // Valor por defecto ya que no existe en Producto
         peso: 0, // Legacy
-        cantidad: items.length, // Legacy
+        cantidad: editarItems.length, // Legacy
         sabor: '', // Legacy
         descripcion: descripcion.trim(),
         precio_total: calcularTotalItems(),
@@ -378,7 +411,7 @@ const EditarPedidoScreen: React.FC = () => {
         es_domicilio: esDomicilio,
         direccion_envio: esDomicilio ? direccionEnvio : undefined,
         fecha_entrega: fechaEntrega,
-      }, items);
+      }, editarItems);
 
       Alert.alert('Éxito', 'Pedido actualizado correctamente', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (error) {
@@ -392,23 +425,14 @@ const EditarPedidoScreen: React.FC = () => {
     debouncedSubmit();
   };
 
-  // Wrapper function to handle type conversion for ItemModal
-  const handleTempItemChange = (item: Omit<PedidoItem, 'id' | 'pedido_id'>) => {
-    setTempItem(item as CrearPedidoItemDTO);
-  };
 
-  // Efecto para mantener los items sincronizados
-  useEffect(() => {
-    console.log('useEffect - items actuales:', items.length, items);
-  }, [items]);
+  // Efecto para monitorear los items
 
   // Cargar datos del pedido al montar
   useEffect(() => {
     const loadPedido = async () => {
       try {
-        console.log('Cargando pedido con ID:', pedidoId);
         const pedido = await getPedidoById(pedidoId);
-        console.log('Pedido cargado:', pedido);
 
         if (pedido) {
           setPedidoActual(pedido);
@@ -429,57 +453,44 @@ const EditarPedidoScreen: React.FC = () => {
           }
 
           // Cargar items del pedido al montar
-            if (pedido.items && pedido.items.length > 0) {
+          if (pedido.items && pedido.items.length > 0) {
 
-              // Filtrar items que tengan productos válidos y datos completos
-              const validOrderItems = pedido.items.filter(item => {
-                const hasProduct = item.producto && item.producto.id && item.producto.id.trim() !== '';
-                const hasValidQuantity = item.cantidad && item.cantidad > 0;
-                const hasValidPrice = item.precio_unitario && item.precio_unitario >= 0;
-
-                console.log(`Validando item ${item.id}:`, {
-                  hasProduct,
-                  hasValidQuantity,
-                  hasValidPrice,
-                  producto_id: item.producto?.id,
-                  cantidad: item.cantidad,
-                  precio_unitario: item.precio_unitario
-                });
-
-                return hasProduct && hasValidQuantity && hasValidPrice;
-              });
+            // Filtrar items que tengan productos válidos y datos completos
+            const validOrderItems = pedido.items.filter(item => {
+              const hasProduct = item.producto && item.producto.id && item.producto.id.trim() !== '';
+              const hasValidQuantity = item.cantidad && item.cantidad > 0;
+              const hasValidPrice = item.precio_unitario && item.precio_unitario >= 0;
 
 
-              if (validOrderItems.length === 0) {
-                console.warn('No hay items válidos en el pedido');
-                setItems([]);
-                setEditarItems([]);
-                setIsItemsLoading(false);
-                return;
-              }
-
-              const formattedItems = validOrderItems.map(item => ({
-                producto_id: item.producto?.id || '',
-                sabor_id: item.sabor?.id || null,
-                relleno_id: item.relleno?.id || null,
-                tamano_id: item.tamano?.id || null,
-                cantidad: item.cantidad,
-                precio_unitario: item.precio_unitario,
-              }));
+              return hasProduct && hasValidQuantity && hasValidPrice;
+            });
 
 
-              // Establecer los items en ambos estados
-              setItems(formattedItems);
-              setEditarItems(formattedItems);
-              setIsItemsLoading(false);
-            } else {
-              console.log('No hay items en el pedido');
-              setItems([]);
+            if (validOrderItems.length === 0) {
+              console.warn('No hay items válidos en el pedido');
               setEditarItems([]);
               setIsItemsLoading(false);
+              return;
             }
+
+            const formattedItems = validOrderItems.map(item => ({
+              producto_id: item.producto?.id || '',
+              sabor_id: item.sabor?.id || null,
+              relleno_id: item.relleno?.id || null,
+              tamano_id: item.tamano?.id || null,
+              cantidad: item.cantidad,
+              precio_unitario: item.precio_unitario,
+            }));
+
+
+            // Establecer los items en el store global
+            setEditarItems(formattedItems);
+            setIsItemsLoading(false);
+          } else {
+            setEditarItems([]);
+            setIsItemsLoading(false);
+          }
         } else {
-          console.log('No se encontró el pedido');
         }
       } catch (error) {
         console.error('Error cargando pedido:', error);
@@ -536,13 +547,13 @@ const EditarPedidoScreen: React.FC = () => {
       Alert.alert('Error', 'Debes ingresar el teléfono del cliente');
       return false;
     }
-    if (items.length === 0) {
+    if (editarItems.length === 0) {
       Alert.alert('Error', 'El carrito está vacío');
       return false;
     }
 
     // Verificar que todos los items tengan productos válidos
-    const invalidItems = items.filter((item: CrearPedidoItemDTO) => !item.producto_id || item.producto_id.trim() === '');
+    const invalidItems = editarItems.filter((item: CrearPedidoItemDTO) => !item.producto_id || item.producto_id.trim() === '');
     if (invalidItems.length > 0) {
       Alert.alert('Error', 'Hay productos inválidos en el carrito');
       return false;
@@ -560,9 +571,9 @@ const EditarPedidoScreen: React.FC = () => {
     return true;
   };
 
-  // Calcular precio total de los items locales
+  // Calcular precio total de los items globales
   const calcularTotalItems = () => {
-    return items.reduce((total, item) => {
+    return editarItems.reduce((total, item) => {
       return total + (item.cantidad * item.precio_unitario);
     }, 0);
   };
@@ -572,70 +583,24 @@ const EditarPedidoScreen: React.FC = () => {
     setShowDatePicker(true);
   };
 
-  const handleOpenItemModal = () => {
-    navigation.navigate('AddItem', { returnTo: 'EditarPedido', pedidoId });
-  };
-
-  const handleRemoveItemLocal = (index: number) => {
-    console.log('Eliminando item en índice:', index);
-    setItems(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleEditItemLocal = (index: number) => {
-    console.log('=== DEPURACIÓN handleEditItemLocal ===');
-    console.log('Index recibido:', index);
-    console.log('Items actuales:', items);
-    console.log('Item a editar:', items[index]);
-    console.log('=====================================');
-    
-    setEditingIndex(index);
-    setTempItem(items[index]);
-    setShowItemModal(true);
+    navigation.navigate('AddItem', {
+      initialItem: editarItems[index],
+      editingIndex: index,
+      returnTo: 'EditarPedido'
+    });
   };
 
   const handleAddItemLocal = () => {
-    setEditingIndex(null);
-    setTempItem({
-      producto_id: '',
-      sabor_id: null,
-      relleno_id: null,
-      tamano_id: null,
-      cantidad: 1,
-      precio_unitario: 0,
-    });
-    setShowItemModal(true);
+    navigation.navigate('AddItem', { returnTo: 'EditarPedido' });
   };
 
-  const handleSaveItem = () => {
-    if (!tempItem) return;
-    
-    if (editingIndex !== null) {
-      // Editar item existente
-      const newItems = [...items];
-      newItems[editingIndex] = tempItem;
-      setItems(newItems);
-    } else {
-      // Agregar nuevo item
-      setItems([...items, tempItem]);
-    }
-    
-    setShowItemModal(false);
-    setEditingIndex(null);
-    setTempItem(null);
+  const handleRemoveItemLocal = (index: number) => {
+    const newItems = editarItems.filter((_, i) => i !== index);
+    setEditarItems(newItems);
   };
 
-  const handleSelectProducto = (producto: Producto) => {
-    setTempItem((prev) => ({
-      producto_id: producto.id,
-      sabor_id: prev?.sabor_id || null,
-      relleno_id: prev?.relleno_id || null,
-      tamano_id: prev?.tamano_id || null,
-      cantidad: prev?.cantidad || 1,
-      precio_unitario: 0 // Precio por defecto ya que no existe en Producto
-    }));
-    loadFilteredOptions(producto.id);
-    setShowProductoSelector(false);
-  };
+  // El selector de productos ahora se maneja dentro de AddItemScreen
 
   if (isLoadingPedido || isLoadingMetadata || isItemsLoading) {
     return (
@@ -671,329 +636,71 @@ const EditarPedidoScreen: React.FC = () => {
     <>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Editar Pedido</Text>
+          <View style={styles.formContainer}>
+            <Text style={styles.title}>Editar Pedido</Text>
 
-          {/* Cliente */}
-          <ClienteForm
-            nombre={clienteNombre}
-            telefono={clienteTelefono}
-            onNombreChange={setClienteNombre}
-            onTelefonoChange={setClienteTelefono}
-          />
+            {/* Cliente */}
+            <ClienteForm
+              nombre={clienteNombre}
+              telefono={clienteTelefono}
+              onNombreChange={setClienteNombre}
+              onTelefonoChange={setClienteTelefono}
+            />
 
-          {/* Carrito de Items */}
-          <ItemsList
-            items={items}
-            productos={productos}
-            sabores={sabores}
-            onEditItem={handleEditItemLocal}
-            onRemoveItem={handleRemoveItemLocal}
-            onAddItem={handleAddItemLocal}
-          />
-          
-        
-          {/* Resumen del Pedido */}
-          <OrderSummary
-            precioTotal={calcularTotalItems()}
-            precioDomicilio={precioDomicilio}
-            esDomicilio={esDomicilio}
-            direccionEnvio={direccionEnvio}
-            abonoInicial={abonoInicial}
-            onAbonoChange={setAbonoInicial}
-            onPrecioDomicilioChange={setPrecioDomicilio}
-            onEsDomicilioChange={setEsDomicilio}
-            onDireccionEnvioChange={setDireccionEnvio}
-            fechaEntrega={fechaEntrega}
-            onFechaChange={() => handleOpenDatePicker('date')}
-            onHoraChange={() => handleOpenDatePicker('time')}
-            descripcion={descripcion}
-            onDescripcionChange={handleDescripcionChange}
-            descripcionHeight={descripcionHeight}
-          />
+            {/* Carrito de Items */}
+            <ItemsList
+              items={editarItems}
+              productos={productos}
+              sabores={sabores}
+              onEditItem={handleEditItemLocal}
+              onRemoveItem={handleRemoveItemLocal}
+              onAddItem={handleAddItemLocal}
+            />
 
-          {/* Botones de acción */}
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
-              <Text>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isUpdating || isSubmitting}>
-              <Text style={{ color: 'white' }}>{isUpdating || isSubmitting ? 'Actualizando...' : 'Actualizar Pedido'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
 
-      {/* Modal para agregar/editar items eliminado ya que ahora es una screen */}
+            {/* Resumen del Pedido */}
+            <OrderSummary
+              precioTotal={calcularTotalItems()}
+              precioDomicilio={precioDomicilio}
+              esDomicilio={esDomicilio}
+              direccionEnvio={direccionEnvio}
+              abonoInicial={abonoInicial}
+              onAbonoChange={setAbonoInicial}
+              onPrecioDomicilioChange={setPrecioDomicilio}
+              onEsDomicilioChange={setEsDomicilio}
+              onDireccionEnvioChange={setDireccionEnvio}
+              fechaEntrega={fechaEntrega}
+              onFechaChange={() => handleOpenDatePicker('date')}
+              onHoraChange={() => handleOpenDatePicker('time')}
+              descripcion={descripcion}
+              onDescripcionChange={handleDescripcionChange}
+              descripcionHeight={descripcionHeight}
+            />
 
-      {/* DateTimePicker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode={datePickerMode}
-          is24Hour={true}
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      )}
-      </KeyboardAvoidingView>
-
-      {/* Modal Bottom Sheet para editar/agregar items */}
-      <Modal visible={showItemModal} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.bottomSheet}>
-          <Text style={styles.modalTitle}>
-            {editingIndex !== null ? 'Editar Item' : 'Agregar Item'}
-          </Text>
-          
-          {tempItem && (
-            <ScrollView style={styles.modalContent}>
-              {/* Producto */}
-              <TouchableOpacity
-                style={styles.fieldContainer}
-                onPress={() => setShowProductoSelector(true)}
-              >
-                <Text style={styles.label}>Producto *</Text>
-                <View style={styles.selectorButton}>
-                  <Text style={styles.selectorText}>
-                    {productos.find(p => p.id === tempItem.producto_id)?.nombre ||
-                      'Seleccionar producto...'}
-                    {productos.find(p => p.id === tempItem.producto_id)?.tipo_medida && (
-                      <Text style={styles.tipoMedidaText}>
-                        {' '}({productos.find(p => p.id === tempItem.producto_id)?.tipo_medida === 'peso' ? 'Por peso' : 'Por tamaño'})
-                      </Text>
-                    )}
-                  </Text>
-                  <Text>▼</Text>
-                </View>
+            {/* Botones de acción */}
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+                <Text>Cancelar</Text>
               </TouchableOpacity>
-
-              {/* Sabor */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Sabor</Text>
-                <View style={styles.chipRow}>
-                  {sabores.filter(s => s.tipo === 'Sabor' || s.tipo === 'Todos').length > 0 ? (
-                    sabores
-                      .filter(s => s.tipo === 'Sabor' || s.tipo === 'Todos')
-                      .map(s => (
-                        <TouchableOpacity
-                          key={s.id}
-                          style={[
-                            styles.chip,
-                            tempItem.sabor_id === s.id && styles.chipActive
-                          ]}
-                          onPress={() => setTempItem(prev => prev ? {...prev, sabor_id: s.id} : null)}
-                        >
-                          <Text style={[
-                            styles.chipText,
-                            tempItem.sabor_id === s.id && styles.chipTextActive
-                          ]}>
-                            {s.nombre}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                  ) : (
-                    <Text style={styles.emptyText}>No hay sabores configurados</Text>
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.chip,
-                      !tempItem.sabor_id && styles.chipActive
-                    ]}
-                    onPress={() => setTempItem(prev => prev ? {...prev, sabor_id: null} : null)}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      !tempItem.sabor_id && styles.chipTextActive
-                    ]}>
-                      Ninguno
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Relleno */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Relleno</Text>
-                <View style={styles.chipRow}>
-                  {sabores.filter(s => s.tipo === 'Relleno' || s.tipo === 'Todos').length > 0 ? (
-                    sabores
-                      .filter(s => s.tipo === 'Relleno' || s.tipo === 'Todos')
-                      .map(s => (
-                        <TouchableOpacity
-                          key={s.id}
-                          style={[
-                            styles.chip,
-                            tempItem.relleno_id === s.id && styles.chipActive
-                          ]}
-                          onPress={() => setTempItem(prev => prev ? {...prev, relleno_id: s.id} : null)}
-                        >
-                          <Text style={[
-                            styles.chipText,
-                            tempItem.relleno_id === s.id && styles.chipTextActive
-                          ]}>
-                            {s.nombre}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                  ) : (
-                    <Text style={styles.emptyText}>No hay rellenos configurados</Text>
-                  )}
-                  <TouchableOpacity
-                    style={[
-                      styles.chip,
-                      !tempItem.relleno_id && styles.chipActive
-                    ]}
-                    onPress={() => setTempItem(prev => prev ? {...prev, relleno_id: null} : null)}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      !tempItem.relleno_id && styles.chipTextActive
-                    ]}>
-                      Ninguno
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Tamaño */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>
-                  {productos.find(p => p.id === tempItem.producto_id)?.tipo_medida === 'peso' ? 'Peso' : 'Tamaño'}
-                  {productos.find(p => p.id === tempItem.producto_id)?.tipo_medida && ' *'}
-                </Text>
-                <View style={styles.chipRow}>
-                  {(() => {
-                    const selectedProduct = productos.find(p => p.id === tempItem.producto_id);
-                    const tamanosFiltrados = selectedProduct?.tipo_medida
-                      ? tamanos.filter(t => t.tipo === selectedProduct.tipo_medida)
-                      : tamanos;
-                    
-                    return tamanosFiltrados.length > 0 ? (
-                      tamanosFiltrados.map(t => (
-                        <TouchableOpacity
-                          key={t.id}
-                          style={[
-                            styles.chip,
-                            tempItem.tamano_id === t.id && styles.chipActive
-                          ]}
-                          onPress={() => setTempItem(prev => prev ? {...prev, tamano_id: t.id} : null)}
-                        >
-                          <Text style={[
-                            styles.chipText,
-                            tempItem.tamano_id === t.id && styles.chipTextActive
-                          ]}>
-                            {t.nombre}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <Text style={styles.emptyText}>
-                        No hay {selectedProduct?.tipo_medida === 'peso' ? 'pesos' : 'tamaños'} configurados
-                      </Text>
-                    );
-                  })()}
-                  {!productos.find(p => p.id === tempItem.producto_id)?.tipo_medida && (
-                    <TouchableOpacity
-                      style={[
-                        styles.chip,
-                        !tempItem.tamano_id && styles.chipActive
-                      ]}
-                      onPress={() => setTempItem(prev => prev ? {...prev, tamano_id: null} : null)}
-                    >
-                      <Text style={[
-                        styles.chipText,
-                        !tempItem.tamano_id && styles.chipTextActive
-                      ]}>
-                        Ninguno
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Cantidad */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Cantidad *</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={tempItem.cantidad.toString()}
-                  onChangeText={(val: string) => setTempItem(prev => prev ? {...prev, cantidad: parseInt(val) || 1} : null)}
-                />
-              </View>
-
-              {/* Precio Unitario */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Precio Unitario *</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={tempItem.precio_unitario.toString()}
-                  onChangeText={(val: string) => setTempItem(prev => prev ? {...prev, precio_unitario: parseFloat(val) || 0} : null)}
-                />
-              </View>
-            </ScrollView>
-          )}
-
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setShowItemModal(false);
-                setEditingIndex(null);
-                setTempItem(null);
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSaveItem}
-            >
-              <Text style={styles.submitButtonText}>Guardar</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isUpdating || isSubmitting}>
+                <Text style={{ color: 'white' }}>{isUpdating || isSubmitting ? 'Actualizando...' : 'Actualizar Pedido'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </View>
-    </Modal>
+        </ScrollView>
 
-      {/* Modal de selección de producto */}
-      <Modal visible={showProductoSelector} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Seleccionar Producto</Text>
-            <ScrollView>
-              {[...productos].reverse().map(p => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setTempItem(prev => prev ? {...prev, producto_id: p.id} : null);
-                    setShowProductoSelector(false);
-                  }}
-                >
-                  <Text style={styles.modalItemText}>
-                    {p.nombre}
-                    {p.tipo_medida && (
-                      <Text style={styles.tipoMedidaText}>
-                        {' '}({p.tipo_medida === 'peso' ? 'Por peso' : 'Por tamaño'})
-                      </Text>
-                    )}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowProductoSelector(false)}
-            >
-              <Text style={styles.modalCloseButtonText}>Cerrar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        {/* DateTimePicker */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode={datePickerMode}
+            is24Hour={true}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+      </KeyboardAvoidingView>
     </>
   );
 };

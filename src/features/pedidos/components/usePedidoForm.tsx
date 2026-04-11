@@ -39,7 +39,7 @@ const useCrearPedidoFormStore = create<PedidoFormState>((set) => ({
   descripcionHeight: 80,
   
   setFormState: (state) => set((prev) => ({ ...prev, ...state })),
-  resetFormState: () => ({
+  resetFormState: () => set(() => ({
     clienteNombre: '',
     clienteTelefono: '',
     items: [],
@@ -51,7 +51,7 @@ const useCrearPedidoFormStore = create<PedidoFormState>((set) => ({
     abonoInicial: 0,
     descripcion: '',
     descripcionHeight: 80,
-  }),
+  })),
 }));
 
 // Store de Zustand para el estado del formulario de EDICIÓN
@@ -69,7 +69,7 @@ const useEditarPedidoFormStore = create<PedidoFormState>((set) => ({
   descripcionHeight: 80,
   
   setFormState: (state) => set((prev) => ({ ...prev, ...state })),
-  resetFormState: () => ({
+  resetFormState: () => set(() => ({
     clienteNombre: '',
     clienteTelefono: '',
     items: [],
@@ -81,7 +81,7 @@ const useEditarPedidoFormStore = create<PedidoFormState>((set) => ({
     abonoInicial: 0,
     descripcion: '',
     descripcionHeight: 80,
-  }),
+  })),
 }));
 
 export const usePedidoForm = (isEditing: boolean = false) => {
@@ -90,6 +90,8 @@ export const usePedidoForm = (isEditing: boolean = false) => {
   
   // Store global de items
   const { 
+    crearItems,
+    editarItems,
     clearCrearItems, 
     clearEditarItems 
   } = useItemsStore();
@@ -133,13 +135,15 @@ export const usePedidoForm = (isEditing: boolean = false) => {
 
   // Calcular precio total automáticamente al cambiar items o domicilio
   useEffect(() => {
-    const itemsTotal = items.reduce((sum: number, item: CrearPedidoItemDTO) => sum + (item.precio_unitario * item.cantidad), 0);
+    // Usar los items del store global correspondiente (crear o editar)
+    const currentItems = isEditing ? editarItems : crearItems;
+    const itemsTotal = currentItems.reduce((sum: number, item: CrearPedidoItemDTO) => sum + (item.precio_unitario * item.cantidad), 0);
     const domicilioCost = esDomicilio ? precioDomicilio : 0;
     const newTotal = itemsTotal + domicilioCost;
     if (newTotal !== precioTotal) {
       setFormState({ precioTotal: newTotal });
     }
-  }, [items, esDomicilio, precioDomicilio, precioTotal, setFormState]);
+  }, [crearItems, editarItems, esDomicilio, precioDomicilio, precioTotal, setFormState, isEditing]);
 
   const loadFilteredOptions = async (productoId: string) => {
     try {
@@ -189,13 +193,15 @@ export const usePedidoForm = (isEditing: boolean = false) => {
       Alert.alert('Error', 'Debes ingresar el teléfono del cliente');
       return false;
     }
-    if (items.length === 0) {
+    // Validar usando los items del store global correspondiente
+    const currentItems = isEditing ? editarItems : crearItems;
+    if (currentItems.length === 0) {
       Alert.alert('Error', 'El carrito está vacío');
       return false;
     }
 
     // Verificar que todos los items tengan productos válidos
-    const invalidItems = items.filter((item: CrearPedidoItemDTO) => !item.producto_id || item.producto_id.trim() === '');
+    const invalidItems = currentItems.filter((item: CrearPedidoItemDTO) => !item.producto_id || item.producto_id.trim() === '');
     if (invalidItems.length > 0) {
       Alert.alert('Error', 'Hay productos inválidos en el carrito');
       return false;
@@ -239,6 +245,9 @@ export const usePedidoForm = (isEditing: boolean = false) => {
     editingItemIndex,
     tempItem,
     filteredOptions,
+    // Items del store global
+    crearItems,
+    editarItems,
     setFilteredOptions,
 
     // Acciones

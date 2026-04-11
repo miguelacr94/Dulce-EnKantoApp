@@ -50,6 +50,14 @@ export interface Tamano {
   nombre: string;
   tipo: 'peso' | 'tamano';
   created_at?: string;
+  insumos_relacionados?: {
+    cantidad: number;
+    insumo: {
+      id: string;
+      nombre: string;
+      medida: string;
+    };
+  }[];
 }
 
 export interface PedidoItem {
@@ -120,4 +128,5 @@ export interface EstadisticasPedidos {
   entregados: number;
   cancelados: number;
   totalPendienteCobrar: number;
+  totalIngresosReal: number;
 }

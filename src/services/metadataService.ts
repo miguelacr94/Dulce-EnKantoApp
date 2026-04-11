@@ -1,11 +1,10 @@
-import { supabase } from '@/services';
+import { supabase } from './supabase';
 import { Producto, Sabor, Tamano } from '@/types';
 
 export const metadataService = {
   // --- PRODUCTOS ---
   async getProductos(): Promise<Producto[]> {
     try {
-      console.log('=== OBTENIENDO PRODUCTOS ===');
       const { data, error } = await supabase
         .from('productos')
         .select('id, nombre, descripcion, tipo_medida, created_at')
@@ -17,10 +16,6 @@ export const metadataService = {
       }
       
       const productos = data || [];
-      console.log(`=== ${productos.length} PRODUCTOS CARGADOS ===`);
-      productos.forEach(p => {
-        console.log(`- ${p.nombre}: ${p.descripcion || 'Sin descripción'} (${p.tipo_medida || 'sin tipo'})`);
-      });
       
       return productos;
     } catch (error) {
@@ -160,8 +155,6 @@ export const metadataService = {
 
   async getTamanosPorProducto(productoId: string): Promise<Tamano[]> {
     try {
-      console.log(`=== FILTRADO DE TAMAÑOS PARA PRODUCTO ${productoId} ===`);
-      
       // Primero obtener el producto para saber su tipo_medida
       const { data: producto, error: errorProducto } = await supabase
         .from('productos')
@@ -169,12 +162,7 @@ export const metadataService = {
         .eq('id', productoId)
         .single();
 
-      if (errorProducto) {
-        console.error('Error obteniendo producto:', errorProducto);
-        throw errorProducto;
-      }
-
-      console.log(`Producto: ${producto?.nombre}, tipo_medida: ${producto?.tipo_medida}`);
+      if (errorProducto) throw errorProducto;
 
       // Obtener los tamaños del producto
       const { data, error } = await supabase
@@ -182,31 +170,16 @@ export const metadataService = {
         .select('tamanos(*)')
         .eq('producto_id', productoId);
 
-      if (error) {
-        console.error('Error obteniendo tamaños del producto:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       // Filtrar los tamaños por el tipo_medida del producto
       const allTamanos = (data || []).map((item: any) => item.tamanos);
-      console.log('Todos los tamaños del producto:', allTamanos);
-      console.log('Detalles de cada tamaño:');
-      allTamanos.forEach((tamano: Tamano) => {
-        console.log(`  - ${tamano.nombre}: id=${tamano.id}, tipo="${tamano.tipo}"`);
-      });
-      
       let filteredTamanos = allTamanos;
       
       if (producto?.tipo_medida) {
-        console.log(`Filtrando tamaños por tipo_medida: "${producto.tipo_medida}"`);
         filteredTamanos = allTamanos.filter((tamano: Tamano) => {
-          const matches = tamano.tipo === producto.tipo_medida;
-          console.log(`Tamano "${tamano.nombre}" (tipo: "${tamano.tipo}") ${matches ? '✅' : '❌'} vs producto tipo_medida: "${producto.tipo_medida}"`);
-          return matches;
+          return tamano.tipo === producto.tipo_medida;
         });
-        console.log(`Tamaños filtrados por tipo_medida "${producto.tipo_medida}":`, filteredTamanos);
-      } else {
-        console.log('Producto sin tipo_medida, retornando todos los tamaños');
       }
       
       return filteredTamanos;
