@@ -141,14 +141,13 @@ export const insumosService = {
     const { error } = await supabase.from('insumo').delete().eq('id', id);
     if (error) throw error;
   },
-  // Descontar stock basado en un pedido entregado y sus switches seleccionados
+  // Descontar stock basado en un pedido entregado y sus switches seleccionados (Legacy - Mantener por compatibilidad)
   async descontarStockPorPedido(items: any[], checkedInsumos: Record<string, boolean>): Promise<void> {
     try {
       for (const item of items) {
         const tamanoId = item.tamano_id || item.tamano?.id;
         if (!tamanoId) continue;
 
-        // 1. Obtener todos los registros de insumo_tamanos que coinciden con el tamaño de este item
         const { data: stockRecords, error: fetchError } = await supabase
           .from('insumo_tamanos')
           .select('id, insumo_id, cantidad')
@@ -157,26 +156,76 @@ export const insumosService = {
         if (fetchError) throw fetchError;
         if (!stockRecords || stockRecords.length === 0) continue;
 
-        // 2. Procesar cada registro de stock encontrado
         for (const record of stockRecords) {
           const key = `${item.id}_${record.insumo_id}`;
           const isChecked = checkedInsumos[key] !== false;
 
-          // Si el switch estaba activo, descontamos
           if (isChecked) {
             const nuevaCantidad = Math.max(0, record.cantidad - (item.cantidad || 1));
-            
-            const { error: updateError } = await supabase
-              .from('insumo_tamanos')
-              .update({ cantidad: nuevaCantidad })
-              .eq('id', record.id);
-
-            if (updateError) throw updateError;
+            await supabase.from('insumo_tamanos').update({ cantidad: nuevaCantidad }).eq('id', record.id);
           }
         }
       }
     } catch (error) {
       console.error('Error descontando stock:', error);
+      throw error;
+    }
+  },
+
+  // 4️⃣ Descontar stock de forma manual y dinámica (NUEVO)
+  async descontarStockManual(descuentos: { insumo_tamano_id: string, cantidadADescontar: number }[]): Promise<void> {
+    try {
+      for (const desc of descuentos) {
+        // 1. Obtener stock actual
+        const { data, error: fetchError } = await supabase
+          .from('insumo_tamanos')
+          .select('cantidad')
+          .eq('id', desc.insumo_tamano_id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // 2. Calcular y actualizar
+        const nuevaCantidad = Math.max(0, (data?.cantidad || 0) - desc.cantidadADescontar);
+        
+        const { error: updateError } = await supabase
+          .from('insumo_tamanos')
+          .update({ cantidad: nuevaCantidad })
+          .eq('id', desc.insumo_tamano_id);
+
+        if (updateError) throw updateError;
+      }
+    } catch (error) {
+      console.error('Error en descontarStockManual:', error);
+      throw error;
+    }
+  },
+
+  // 5️⃣ Devolver stock al inventario (Sumar)
+  async devolverStockManual(devoluciones: { insumo_tamano_id: string, cantidadADevolver: number }[]): Promise<void> {
+    try {
+      for (const dev of devoluciones) {
+        // 1. Obtener stock actual
+        const { data, error: fetchError } = await supabase
+          .from('insumo_tamanos')
+          .select('cantidad')
+          .eq('id', dev.insumo_tamano_id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // 2. Calcular y sumar
+        const nuevaCantidad = (data?.cantidad || 0) + dev.cantidadADevolver;
+        
+        const { error: updateError } = await supabase
+          .from('insumo_tamanos')
+          .update({ cantidad: nuevaCantidad })
+          .eq('id', dev.insumo_tamano_id);
+
+        if (updateError) throw updateError;
+      }
+    } catch (error) {
+      console.error('Error en devolverStockManual:', error);
       throw error;
     }
   }

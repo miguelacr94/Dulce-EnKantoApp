@@ -130,7 +130,7 @@ export function usePedidos(): UsePedidosReturn {
       items: CrearPedidoItemDTO[];
     }) => pedidosRepository.create(pedido, items),
     onSuccess: async (result, variables) => {
-      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
+      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.all });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
@@ -181,7 +181,7 @@ export function usePedidos(): UsePedidosReturn {
       items?: CrearPedidoItemDTO[];
     }) => pedidosRepository.update(id, pedido, items),
     onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
+      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.all });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
@@ -199,7 +199,7 @@ export function usePedidos(): UsePedidosReturn {
     mutationFn: ({ id, estado }: { id: string; estado: EstadoPedido }) =>
       pedidosRepository.cambiarEstado(id, estado),
     onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
+      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.all });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });
@@ -216,7 +216,7 @@ export function usePedidos(): UsePedidosReturn {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => pedidosRepository.delete(id),
     onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.lists() });
+      queryClient.invalidateQueries({ queryKey: PEDIDOS_QUERY_KEYS.all });
       queryClient.invalidateQueries({
         queryKey: PEDIDOS_QUERY_KEYS.estadisticas(),
       });

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@/app/navigation/AppNavigator';
@@ -94,7 +95,8 @@ const GestionInsumosScreen: React.FC = () => {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+            <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Inventario de Insumos</Text>
                 <Text style={styles.subtitle}>Gestiona el stock de tus materiales</Text>
@@ -130,11 +132,16 @@ const GestionInsumosScreen: React.FC = () => {
             >
                 <Text style={styles.fabText}>+</Text>
             </TouchableOpacity>
-        </View>
+            </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+    },
     container: {
         flex: 1,
         backgroundColor: '#F8F9FA',

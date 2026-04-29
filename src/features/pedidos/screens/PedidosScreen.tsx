@@ -8,6 +8,7 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePedidos, type EstadoPedido } from '@/features/pedidos';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '@/utils';
 import { useNavigation } from '@react-navigation/native';
@@ -39,12 +40,27 @@ const PedidosScreen: React.FC = () => {
     return coincideEstado && coincideBusqueda;
   });
 
-  // Ordenar por fecha de entrega solo cuando el filtro es 'entregado'
-  if (filtro === 'entregado') {
-    pedidosFiltrados = [...pedidosFiltrados].sort((a, b) => 
-      new Date(b.fecha_entrega).getTime() - new Date(a.fecha_entrega).getTime()
-    );
-  }
+  // Ordenar pedidos: Pendientes primero, luego Entregados y Cancelados
+  // Dentro de cada estado, ordenar por fecha de entrega (más reciente primero)
+  pedidosFiltrados = [...pedidosFiltrados].sort((a, b) => {
+    // Definir pesos para los estados
+    const prioridadEstado: Record<string, number> = {
+      'pendiente': 0,
+      'entregado': 1,
+      'cancelado': 2
+    };
+
+    const prioridadA = prioridadEstado[a.estado] ?? 99;
+    const prioridadB = prioridadEstado[b.estado] ?? 99;
+
+    // Si las prioridades son distintas, ordenar por estado
+    if (prioridadA !== prioridadB) {
+      return prioridadA - prioridadB;
+    }
+
+    // Si son del mismo estado, ordenar por fecha de entrega (más reciente arriba)
+    return new Date(b.fecha_entrega).getTime() - new Date(a.fecha_entrega).getTime();
+  });
 
   const getCount = (estado: EstadoPedido | 'todos') => {
     if (estado === 'todos') return pedidos.length;
@@ -70,7 +86,8 @@ const PedidosScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
       {/* Barra de búsqueda */}
       <View style={styles.searchContainer}>
         <TextInput
@@ -119,11 +136,16 @@ const PedidosScreen: React.FC = () => {
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

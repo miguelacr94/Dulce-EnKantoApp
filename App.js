@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryProvider } from './src/providers/QueryProvider';
 import AppNavigator from './src/app/navigation/AppNavigator';
 import { notificationService } from '@/app/core/notifications';
@@ -25,10 +26,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <QueryProvider>
-      <NavigationContainer>
-        <AppContent />
-      </NavigationContainer>
-    </QueryProvider>
+    <SafeAreaProvider>
+      <QueryProvider>
+        <NavigationContainer>
+          <AppContent />
+        </NavigationContainer>
+      </QueryProvider>
+    </SafeAreaProvider>
   );
 }

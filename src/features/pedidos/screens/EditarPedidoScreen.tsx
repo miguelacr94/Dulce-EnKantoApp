@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
@@ -33,9 +34,12 @@ import {
 } from '../components';
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  container: {
+    flex: 1,
   },
   formContainer: {
     padding: SPACING.lg,
@@ -302,8 +306,8 @@ const EditarPedidoScreen: React.FC = () => {
   const navigation = useNavigation<EditarPedidoScreenNavigationProp>();
   const isFocused = useIsFocused();
   const { pedidoId } = route.params;
-
   const { updatePedido, getPedidoById, isUpdating } = usePedidos();
+  const { abonos: abonosDB, createAbono, isLoading: isLoadingAbonos } = useAbonos(pedidoId);
   const { productos, sabores, tamanos, isLoading: isLoadingMetadata } = useMetadata();
 
 
@@ -334,6 +338,7 @@ const EditarPedidoScreen: React.FC = () => {
     direccionEnvio,
     fechaEntrega,
     abonoInicial,
+    totalAbonado,
     descripcion,
     descripcionHeight,
     filteredOptions,
@@ -343,6 +348,7 @@ const EditarPedidoScreen: React.FC = () => {
     setItems: setHookItems,
     setFechaEntrega,
     setAbonoInicial,
+    setTotalAbonado,
     setPrecioDomicilio,
     setEsDomicilio,
     setDireccionEnvio,
@@ -406,12 +412,20 @@ const EditarPedidoScreen: React.FC = () => {
         cantidad: editarItems.length, // Legacy
         sabor: '', // Legacy
         descripcion: descripcion.trim(),
-        precio_total: calcularTotalItems(),
+        precio_total: precioTotal,
         precio_domicilio: precioDomicilio,
         es_domicilio: esDomicilio,
         direccion_envio: esDomicilio ? direccionEnvio : undefined,
         fecha_entrega: fechaEntrega,
       }, editarItems);
+
+      // Si hay un nuevo abono ingresado, guardarlo
+      if (abonoInicial > 0) {
+        await createAbono({
+          pedido_id: pedidoActual.id,
+          monto: abonoInicial,
+        });
+      }
 
       Alert.alert('Éxito', 'Pedido actualizado correctamente', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (error) {
@@ -445,6 +459,8 @@ const EditarPedidoScreen: React.FC = () => {
           setPrecioDomicilio(pedido.precio_domicilio || 0);
           setEsDomicilio(pedido.es_domicilio || false);
           setDireccionEnvio(pedido.direccion_envio || '');
+          
+          setAbonoInicial(0); // Empezar con 0 para el nuevo abono
 
           // Inicializar selectedDate con la fecha del pedido
           if (pedido.fecha_entrega) {
@@ -504,6 +520,23 @@ const EditarPedidoScreen: React.FC = () => {
 
     loadPedido();
   }, [pedidoId]);
+
+  // Recargar datos cuando la pantalla gane el foco (por si cambió el estado en detalle)
+  useEffect(() => {
+    if (isFocused) {
+      const refreshPedido = async () => {
+        try {
+          const pedido = await getPedidoById(pedidoId);
+          if (pedido) {
+            setPedidoActual(pedido);
+          }
+        } catch (error) {
+          console.error('Error refrescando pedido:', error);
+        }
+      };
+      refreshPedido();
+    }
+  }, [isFocused, pedidoId]);
 
   const handleDateChange = (event: any, date?: Date) => {
     setShowDatePicker(false);
@@ -602,38 +635,45 @@ const EditarPedidoScreen: React.FC = () => {
 
   // El selector de productos ahora se maneja dentro de AddItemScreen
 
-  if (isLoadingPedido || isLoadingMetadata || isItemsLoading) {
+  // Cálculo dinámico del total abonado real desde la base de datos
+  const totalAbonadoReal = abonosDB?.reduce((sum, a) => sum + a.monto, 0) || 0;
+
+  if (isLoadingPedido || isLoadingMetadata || isItemsLoading || isLoadingAbonos) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Cargando...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <Text>Cargando pedido y pagos...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   // Solo permitir editar pedidos pendientes
   if (pedidoActual && pedidoActual.estado !== 'pendiente') {
     return (
-      <View style={styles.container}>
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Editar Pedido</Text>
-          <View style={styles.warningContainer}>
-            <Text style={styles.warningText}>
-              Solo se pueden editar pedidos en estado "pendiente".
-            </Text>
-            <Text style={styles.warningSubtext}>
-              Estado actual: {pedidoActual.estado}
-            </Text>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <View style={styles.formContainer}>
+            <Text style={styles.title}>Editar Pedido</Text>
+            <View style={styles.warningContainer}>
+              <Text style={styles.warningText}>
+                Solo se pueden editar pedidos en estado "pendiente".
+              </Text>
+              <Text style={styles.warningSubtext}>
+                Estado actual: {pedidoActual.estado}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Text style={styles.backButtonText}>Volver</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>Volver</Text>
-          </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
           <View style={styles.formContainer}>
@@ -660,11 +700,12 @@ const EditarPedidoScreen: React.FC = () => {
 
             {/* Resumen del Pedido */}
             <OrderSummary
-              precioTotal={calcularTotalItems()}
+              precioTotal={precioTotal}
               precioDomicilio={precioDomicilio}
               esDomicilio={esDomicilio}
               direccionEnvio={direccionEnvio}
               abonoInicial={abonoInicial}
+              totalAbonado={totalAbonadoReal}
               onAbonoChange={setAbonoInicial}
               onPrecioDomicilioChange={setPrecioDomicilio}
               onEsDomicilioChange={setEsDomicilio}
@@ -701,7 +742,7 @@ const EditarPedidoScreen: React.FC = () => {
           />
         )}
       </KeyboardAvoidingView>
-    </>
+    </SafeAreaView>
   );
 };
 

@@ -8,6 +8,7 @@ interface OrderSummaryProps {
   esDomicilio: boolean;
   direccionEnvio: string;
   abonoInicial: number;
+  totalAbonado: number;
   onAbonoChange: (value: number) => void;
   onPrecioDomicilioChange: (value: number) => void;
   onEsDomicilioChange: (value: boolean) => void;
@@ -26,6 +27,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
   esDomicilio,
   direccionEnvio,
   abonoInicial,
+  totalAbonado,
   onAbonoChange,
   onPrecioDomicilioChange,
   onEsDomicilioChange,
@@ -39,6 +41,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
 }) => {
   // Calcular subtotal sin domicilio
   const subtotal = precioTotal - (esDomicilio ? precioDomicilio : 0);
+  const saldoPendiente = precioTotal - totalAbonado - abonoInicial;
 
   const formatDateLabel = (dateStr: string) => {
     try {
@@ -68,10 +71,15 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
 
         {/* Detalle de precios */}
         <View style={styles.precioDetalle}>
-          <Text style={styles.precioItem}>Subtotal: {formatCurrency(subtotal)}</Text>
+          <Text style={styles.precioItem}>Subtotal productos: {formatCurrency(subtotal)}</Text>
           {esDomicilio && (
             <Text style={styles.precioItem}>
               Domicilio: {formatCurrency(precioDomicilio)}
+            </Text>
+          )}
+          {totalAbonado > 0 && (
+            <Text style={[styles.precioItem, { color: COLORS.success, fontWeight: '600' }]}>
+              Abonado registrado: {formatCurrency(totalAbonado)}
             </Text>
           )}
         </View>
@@ -116,20 +124,31 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
         </View>
 
         <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Abono Inicial</Text>
+          <Text style={styles.label}>
+            {totalAbonado > 0 ? 'Agregar nuevo abono' : 'Abono Inicial'}
+          </Text>
           <TextInput
             style={styles.input}
             keyboardType="numeric"
-            value={abonoInicial.toString()}
+            placeholder="$ 0.00"
+            value={abonoInicial === 0 ? '' : abonoInicial.toString()}
             onChangeText={(val) => onAbonoChange(parseFloat(val) || 0)}
           />
         </View>
 
-        {abonoInicial > 0 && (
+        <View style={styles.saldoContainer}>
           <Text style={styles.saldoText}>
-            Saldo pendiente: {formatCurrency(precioTotal - abonoInicial)}
+            Saldo restante:{' '}
+            <Text style={{ fontWeight: 'bold', color: saldoPendiente <= 0 ? COLORS.success : COLORS.error }}>
+              {formatCurrency(Math.max(0, saldoPendiente))}
+            </Text>
           </Text>
-        )}
+          {saldoPendiente < 0 && (
+            <Text style={[styles.saldoText, { fontSize: 10, color: COLORS.warning }]}>
+              (El abono supera el total)
+            </Text>
+          )}
+        </View>
       </View>
 
       {/* Entrega */}
@@ -257,10 +276,15 @@ const styles = StyleSheet.create({
     fontSize: FONTS.medium,
     color: COLORS.text,
   },
-  saldoText: {
-    fontSize: FONTS.small,
-    color: COLORS.textMuted,
-    textAlign: 'center' as const,
+  saldoContainer: {
     marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    alignItems: 'center',
+  },
+  saldoText: {
+    fontSize: FONTS.medium,
+    color: COLORS.text,
   },
 });

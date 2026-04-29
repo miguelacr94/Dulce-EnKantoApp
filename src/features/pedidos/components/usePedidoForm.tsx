@@ -18,6 +18,7 @@ interface PedidoFormState {
   direccionEnvio: string;
   fechaEntrega: string;
   abonoInicial: number;
+  totalAbonado: number;
   descripcion: string;
   descripcionHeight: number;
   setFormState: (state: Partial<PedidoFormState>) => void;
@@ -35,6 +36,7 @@ const useCrearPedidoFormStore = create<PedidoFormState>((set) => ({
   direccionEnvio: '',
   fechaEntrega: formatDateTimeForDB(new Date()),
   abonoInicial: 0,
+  totalAbonado: 0,
   descripcion: '',
   descripcionHeight: 80,
   
@@ -49,6 +51,7 @@ const useCrearPedidoFormStore = create<PedidoFormState>((set) => ({
     direccionEnvio: '',
     fechaEntrega: formatDateTimeForDB(new Date()),
     abonoInicial: 0,
+    totalAbonado: 0,
     descripcion: '',
     descripcionHeight: 80,
   })),
@@ -65,6 +68,7 @@ const useEditarPedidoFormStore = create<PedidoFormState>((set) => ({
   direccionEnvio: '',
   fechaEntrega: formatDateTimeForDB(new Date()),
   abonoInicial: 0,
+  totalAbonado: 0,
   descripcion: '',
   descripcionHeight: 80,
   
@@ -79,6 +83,7 @@ const useEditarPedidoFormStore = create<PedidoFormState>((set) => ({
     direccionEnvio: '',
     fechaEntrega: formatDateTimeForDB(new Date()),
     abonoInicial: 0,
+    totalAbonado: 0,
     descripcion: '',
     descripcionHeight: 80,
   })),
@@ -107,6 +112,7 @@ export const usePedidoForm = (isEditing: boolean = false) => {
     direccionEnvio,
     fechaEntrega,
     abonoInicial,
+    totalAbonado,
     descripcion,
     descripcionHeight,
     setFormState,
@@ -239,6 +245,7 @@ export const usePedidoForm = (isEditing: boolean = false) => {
     direccionEnvio,
     fechaEntrega,
     abonoInicial,
+    totalAbonado,
     descripcion,
     descripcionHeight,
     showItemModal,
@@ -266,6 +273,7 @@ export const usePedidoForm = (isEditing: boolean = false) => {
     },
     setFechaEntrega: (value: string) => setFormState({ fechaEntrega: value }),
     setAbonoInicial: (value: number) => setFormState({ abonoInicial: value }),
+    setTotalAbonado: (value: number) => setFormState({ totalAbonado: value }),
     setPrecioDomicilio: (value: number) => setFormState({ precioDomicilio: value }),
     setEsDomicilio: (value: boolean) => setFormState({ esDomicilio: value }),
     setDireccionEnvio: (value: string) => setFormState({ direccionEnvio: value }),

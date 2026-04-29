@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@/app/navigation/AppNavigator';
@@ -15,7 +16,8 @@ const ConfiguracionScreen: React.FC = () => {
     ];
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <SafeAreaView style={styles.safeArea}>
+            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             <View style={styles.content}>
                 <Text style={styles.title}>Configuración</Text>
                 {configOptions.map((option, index) => (
@@ -31,10 +33,12 @@ const ConfiguracionScreen: React.FC = () => {
                 ))}
             </View>
         </ScrollView>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: COLORS.background },
     container: { flex: 1, backgroundColor: COLORS.background },
     content: { padding: SPACING.lg },
     title: { fontSize: FONTS.title, fontWeight: 'bold', color: COLORS.text, marginBottom: SPACING.xl },

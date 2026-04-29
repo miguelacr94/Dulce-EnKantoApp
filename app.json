@@ -40,11 +40,11 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "eas": {
-        "projectId": "b5f1ab29-8806-4f65-8243-719d19f0fee9"
-      },
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "b5f1ab29-8806-4f65-8243-719d19f0fee9"
       }
     },
     "plugins": [
@@ -63,6 +63,7 @@
         }
       ],
       "expo-router"
-    ]
+    ],
+    "owner": "miguelacr94"
   }
 }

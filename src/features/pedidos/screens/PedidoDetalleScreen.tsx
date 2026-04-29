@@ -11,10 +11,11 @@ import {
   RefreshControl,
   Switch,
 } from 'react-native';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute, RouteProp, useNavigation, useIsFocused } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@/app/navigation/AppNavigator';
-import { usePedidos, type PedidoConDetalles, type Abono, type EstadoPedido } from '@/features/pedidos';
+import { usePedidos, usePedido, type PedidoConDetalles, type Abono, type EstadoPedido } from '@/features/pedidos';
 import { useAbonos } from '@/features/pedidos/hooks';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, SHADOWS } from '@/utils';
 import { formatCurrency, formatDateTime, formatDateForDB, getEstadoColor, getProductoLabel } from '@/utils';
@@ -27,9 +28,11 @@ type PedidoDetalleScreenNavigationProp = StackNavigationProp<RootStackParamList,
 const PedidoDetalleScreen: React.FC = () => {
   const route = useRoute<PedidoDetalleScreenRouteProp>();
   const navigation = useNavigation<PedidoDetalleScreenNavigationProp>();
+  const isFocused = useIsFocused();
   const { pedidoId } = route.params;
 
-  const { getPedidoById, cambiarEstado, updatePedido, deletePedido, isChangingEstado, isUpdating, isDeleting: isDeletingPedido } = usePedidos();
+  const { cambiarEstado, updatePedido, deletePedido, isChangingEstado, isUpdating, isDeleting: isDeletingPedido } = usePedidos();
+  const { data: pedidoActual, isLoading: isLoadingPedido, refetch: refetchPedido } = usePedido(pedidoId);
   const { abonos, createAbono, deleteAbono, isCreating, isDeleting: isDeletingAbono } = useAbonos(pedidoId);
   const { insumos, loadInsumos } = useInsumos();
 
@@ -38,18 +41,66 @@ const PedidoDetalleScreen: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedEstado, setSelectedEstado] = useState<EstadoPedido | null>(null);
   const [nuevoAbono, setNuevoAbono] = useState('');
-  const [pedidoActual, setPedidoActual] = useState<PedidoConDetalles | null>(null);
   const [checkedInsumos, setCheckedInsumos] = useState<Record<string, boolean>>({});
+  const [seleccionInsumos, setSeleccionInsumos] = useState<Record<string, any[]>>({});
+  const [showInsumoSelectorModal, setShowInsumoSelectorModal] = useState(false);
+  const [activeItemForInsumo, setActiveItemForInsumo] = useState<string | null>(null);
+  const [estadoPedidoLocal, setEstadoPedidoLocal] = useState<EstadoPedido | null>(null);
 
-  // Cargar el pedido al montar el componente
+  // Cargar insumos al montar
   useEffect(() => {
-    const loadPedido = async () => {
-      const pedido = await getPedidoById(pedidoId);
-      setPedidoActual(pedido);
-    };
-    loadPedido();
     loadInsumos();
-  }, [pedidoId, getPedidoById, loadInsumos]);
+  }, [loadInsumos]);
+
+  // Refrescar datos cuando la pantalla gane el foco (al volver de editar)
+  useEffect(() => {
+    if (isFocused) {
+      refetchPedido();
+    }
+  }, [isFocused]);
+
+  // Sincronizar estado local con el del servidor
+  useEffect(() => {
+    if (pedidoActual?.estado) {
+      setEstadoPedidoLocal(pedidoActual.estado);
+    }
+  }, [pedidoActual?.estado]);
+
+  // Sincronizar selección de insumos con los items del pedido
+  useEffect(() => {
+    if (pedidoActual && insumos.length > 0) {
+      setSeleccionInsumos(prev => {
+        const nuevaSeleccion = { ...prev };
+        let huboCambios = false;
+
+        // 1. Eliminar entradas de items que ya no existen en el pedido
+        const itemIdsActuales = pedidoActual.items?.map(i => i.id) || [];
+        Object.keys(nuevaSeleccion).forEach(itemId => {
+          if (!itemIdsActuales.includes(itemId)) {
+            delete nuevaSeleccion[itemId];
+            huboCambios = true;
+          }
+        });
+
+        // 2. Inicializar sugeridos para items nuevos
+        pedidoActual.items?.forEach(item => {
+          if (!nuevaSeleccion[item.id]) {
+            const sugeridos = getInsumosParaItem(item);
+            nuevaSeleccion[item.id] = sugeridos.map(s => ({
+              id: s.id,
+              insumo_id: s.insumoId,
+              nombre: s.nombre,
+              tamano: s.tamanoNombre || '',
+              cantidad: 1
+            }));
+            huboCambios = true;
+          }
+        });
+
+        return huboCambios ? nuevaSeleccion : prev;
+      });
+    }
+  }, [pedidoActual, insumos]);
 
   // Helper local para cruzar datos de inventario
   const getInsumosParaItem = (item: any) => {
@@ -63,9 +114,44 @@ const PedidoDetalleScreen: React.FC = () => {
           id: it.id,
           insumoId: insumo.id,
           nombre: insumo.nombre,
-          cantidad: it.cantidad
+          tamanoNombre: it.tamano?.nombre,
+          cantidadStock: it.cantidad
         }))
     );
+  };
+
+  const handleAddInsumoManual = (itemId: string, insumoTamano: any) => {
+    setSeleccionInsumos(prev => {
+      const current = prev[itemId] || [];
+      // Si ya existe, podríamos sumar, pero mejor permitir líneas duplicadas si el usuario quiere
+      return {
+        ...prev,
+        [itemId]: [...current, {
+          id: insumoTamano.id,
+          insumo_id: insumoTamano.insumo_id,
+          nombre: insumoTamano.insumoNombre,
+          tamano: insumoTamano.tamanoNombre,
+          cantidad: 1
+        }]
+      };
+    });
+    setShowInsumoSelectorModal(false);
+  };
+
+  const handleRemoveInsumoManual = (itemId: string, index: number) => {
+    setSeleccionInsumos(prev => ({
+      ...prev,
+      [itemId]: prev[itemId].filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleUpdateInsumoCantidad = (itemId: string, index: number, delta: number) => {
+    setSeleccionInsumos(prev => ({
+      ...prev,
+      [itemId]: prev[itemId].map((ins, i) => 
+        i === index ? { ...ins, cantidad: Math.max(1, ins.cantidad + delta) } : ins
+      )
+    }));
   };
 
   const toggleInsumo = (itemId: string | number, insumoId: string | number) => {
@@ -76,14 +162,21 @@ const PedidoDetalleScreen: React.FC = () => {
     }));
   };
 
-  // Si no hay pedido actual, mostrar mensaje de carga
-  if (!pedidoActual) {
+  // Si no hay pedido actual o está cargando, mostrar mensaje de carga
+  if (isLoadingPedido || !pedidoActual) {
     return (
-      <View style={styles.loadingContainer}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <Text style={styles.loadingText}>Cargando pedido...</Text>
-      </View>
+      </ScrollView>
+    </SafeAreaView>
     );
   }
+
+  // Cálculos dinámicos de abonos y saldo (fuente de verdad: hook de abonos)
+  const totalAbonadoCalculado = abonos.reduce((sum, abono) => sum + abono.monto, 0);
+  const saldoPendienteCalculado = pedidoActual.precio_total - totalAbonadoCalculado;
+  const esPedidoPagado = saldoPendienteCalculado <= 0;
 
   const handleConfirmarEstado = (nuevoEstado: EstadoPedido) => {
     setSelectedEstado(nuevoEstado);
@@ -94,19 +187,60 @@ const PedidoDetalleScreen: React.FC = () => {
     if (!selectedEstado || !pedidoActual) return;
 
     try {
-      // Si el estado cambia a entregado, descontamos el stock primero
-      if (selectedEstado === 'entregado' && pedidoActual.items) {
-        try {
-          await insumosService.descontarStockPorPedido(pedidoActual.items, checkedInsumos);
-        } catch (stockError) {
-          console.error('Error descontando stock:', stockError);
-          Alert.alert('Advertencia', 'El pedido se actualizará pero hubo un error al descontar el inventario.');
+      // Si el estado cambia a entregado, descontamos el stock dinámico
+      if (selectedEstado === 'entregado') {
+        const descuentos: { insumo_tamano_id: string, cantidadADescontar: number }[] = [];
+        
+        Object.values(seleccionInsumos).forEach(itemInsumos => {
+          itemInsumos.forEach(ins => {
+            descuentos.push({
+              insumo_tamano_id: ins.id,
+              cantidadADescontar: ins.cantidad
+            });
+          });
+        });
+
+        if (descuentos.length > 0) {
+          try {
+            await insumosService.descontarStockManual(descuentos);
+          } catch (stockError) {
+            console.error('Error descontando stock:', stockError);
+            Alert.alert('Advertencia', 'El pedido se actualizará pero hubo un error al descontar el inventario.');
+          }
+        }
+      }
+
+      // Si el estado cambia de entregado a pendiente, devolvemos el stock
+      if (selectedEstado === 'pendiente' && pedidoActual.estado === 'entregado') {
+        const devoluciones: { insumo_tamano_id: string, cantidadADevolver: number }[] = [];
+        
+        Object.values(seleccionInsumos).forEach(itemInsumos => {
+          itemInsumos.forEach(ins => {
+            devoluciones.push({
+              insumo_tamano_id: ins.id,
+              cantidadADevolver: ins.cantidad
+            });
+          });
+        });
+
+        if (devoluciones.length > 0) {
+          try {
+            await insumosService.devolverStockManual(devoluciones);
+          } catch (stockError) {
+            console.error('Error devolviendo stock:', stockError);
+            Alert.alert('Advertencia', 'El pedido se actualizará pero hubo un error al devolver el inventario.');
+          }
         }
       }
 
       await cambiarEstado(pedidoActual.id, selectedEstado);
-      const updatedPedido = await getPedidoById(pedidoId);
-      setPedidoActual(updatedPedido);
+      
+      // Actualizar estado local inmediatamente para feedback visual
+      setEstadoPedidoLocal(selectedEstado);
+      
+      // Forzar refresco de datos en segundo plano
+      await refetchPedido();
+      
       setShowConfirmModal(false);
       setSelectedEstado(null);
       Alert.alert('Éxito', `Pedido ${selectedEstado === 'entregado' ? 'entregado' : selectedEstado === 'cancelado' ? 'cancelado' : 'actualizado'} correctamente`);
@@ -123,7 +257,7 @@ const PedidoDetalleScreen: React.FC = () => {
       return;
     }
 
-    if (monto > pedidoActual.saldo_pendiente) {
+    if (monto > saldoPendienteCalculado) {
       Alert.alert('Error', 'El abono no puede superar el saldo pendiente');
       return;
     }
@@ -276,10 +410,10 @@ const PedidoDetalleScreen: React.FC = () => {
             </Text>?
           </Text>
 
-          {selectedEstado === 'entregado' && pedidoActual.saldo_pendiente > 0 && (
+          {selectedEstado === 'entregado' && saldoPendienteCalculado > 0 && (
             <View style={styles.warningBox}>
               <Text style={styles.warningText}>
-                ⚠️ Nota: El pedido tiene un saldo pendiente de {formatCurrency(pedidoActual.saldo_pendiente)}.
+                ⚠️ Nota: El pedido tiene un saldo pendiente de {formatCurrency(saldoPendienteCalculado)}.
               </Text>
             </View>
           )}
@@ -335,7 +469,7 @@ const PedidoDetalleScreen: React.FC = () => {
               keyboardType="numeric"
             />
             <Text style={styles.modalHelper}>
-              Saldo pendiente: {formatCurrency(pedidoActual.saldo_pendiente)}
+              Saldo pendiente: {formatCurrency(saldoPendienteCalculado)}
             </Text>
           </View>
 
@@ -363,12 +497,13 @@ const PedidoDetalleScreen: React.FC = () => {
   );
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={isChangingEstado} onRefresh={() => { }} />
-      }
-    >
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={isLoadingPedido || isChangingEstado} onRefresh={refetchPedido} />
+        }
+      >
       {/* Header del Pedido */}
       <View style={styles.headerCard}>
         <View style={styles.headerRow}>
@@ -432,37 +567,69 @@ const PedidoDetalleScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Indicadores de Insumos/Suministros con Switch */}
-              {getInsumosParaItem(item).length > 0 && (
-                <View style={styles.inventoryCheckContainer}>
-                  <Text style={styles.inventoryCheckTitle}>Confirmar insumos para este tamaño:</Text>
-                  <View style={styles.inventorySwitchList}>
-                    {getInsumosParaItem(item).map((insumo) => {
-                      const key = `${item.id}_${insumo.insumoId}`;
-                      const isChecked = checkedInsumos[key] !== false;
-                      
-                      return (
-                        <View key={insumo.id} style={styles.inventorySwitchItem}>
-                          <View style={styles.inventorySwitchLabel}>
-                            <Text style={[
-                              styles.inventoryBadgeText,
-                              insumo.cantidad <= 0 && styles.noStockText
-                            ]}>
-                              {insumo.cantidad > 0 ? '✅' : '⚠️'} Descartar {insumo.nombre}: {insumo.cantidad}
-                            </Text>
-                          </View>
-                          <Switch
-                            trackColor={{ false: '#767577', true: COLORS.primary + '80' }}
-                            thumbColor={isChecked ? COLORS.primary : '#f4f3f4'}
-                            onValueChange={() => toggleInsumo(item.id, insumo.insumoId)}
-                            value={isChecked}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
+              {/* Gestión Dinámica de Insumos (Empaque) */}
+              <View style={styles.inventoryCheckContainer}>
+                <View style={styles.inventoryHeader}>
+                  <Text style={styles.inventoryCheckTitle}>Empaque / Insumos a descontar:</Text>
+                  {estadoPedidoLocal !== 'entregado' && (
+                    <TouchableOpacity 
+                      style={styles.addInsumoBadge}
+                      onPress={() => {
+                        setActiveItemForInsumo(item.id);
+                        setShowInsumoSelectorModal(true);
+                      }}
+                    >
+                      <Text style={styles.addInsumoBadgeText}>+ Agregar</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              )}
+
+                {estadoPedidoLocal === 'entregado' && (
+                  <View style={styles.lockedBadge}>
+                    <Text style={styles.lockedBadgeText}>🔒 Configuración de empaque entregada</Text>
+                  </View>
+                )}
+
+                <View style={styles.inventorySelectedList}>
+                  {seleccionInsumos[item.id]?.length > 0 ? (
+                    seleccionInsumos[item.id].map((insSelect, idx) => (
+                      <View key={`${item.id}_${idx}`} style={styles.inventorySelectItem}>
+                        <View style={styles.inventorySelectInfo}>
+                          <Text style={styles.inventorySelectName}>{insSelect.nombre}</Text>
+                          <Text style={styles.inventorySelectSize}>{insSelect.tamano}</Text>
+                        </View>
+                        
+                        <View style={styles.inventoryQtyControl}>
+                          <TouchableOpacity 
+                            onPress={() => estadoPedidoLocal !== 'entregado' && handleUpdateInsumoCantidad(item.id, idx, -1)}
+                            style={estadoPedidoLocal === 'entregado' && { opacity: 0.3 }}
+                          >
+                            <Text style={styles.qtyBtn}>-</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.qtyText}>{insSelect.cantidad}</Text>
+                          <TouchableOpacity 
+                            onPress={() => estadoPedidoLocal !== 'entregado' && handleUpdateInsumoCantidad(item.id, idx, 1)}
+                            style={estadoPedidoLocal === 'entregado' && { opacity: 0.3 }}
+                          >
+                            <Text style={styles.qtyBtn}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {estadoPedidoLocal !== 'entregado' && (
+                          <TouchableOpacity 
+                            style={styles.removeInsumoBtn}
+                            onPress={() => handleRemoveInsumoManual(item.id, idx)}
+                          >
+                            <Text style={styles.removeInsumoIcon}>✕</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.noInsumosText}>No se descontará empaque para este item</Text>
+                  )}
+                </View>
+              </View>
 
               {index < (pedidoActual.items?.length ?? 0) - 1 && (
                 <View style={styles.itemSeparator} />
@@ -474,22 +641,41 @@ const PedidoDetalleScreen: React.FC = () => {
         )}
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Descripción:</Text>
-          <Text style={styles.detailValue}>{pedidoActual.descripcion || 'Sin descripción'}</Text>
-        </View>
-
-        <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Fecha y Hora de Entrega:</Text>
           <Text style={styles.detailValue}>{formatDateTime(pedidoActual.fecha_entrega)}</Text>
         </View>
       </View>
+
+      {/* Notas del Pedido */}
+      {pedidoActual.descripcion ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Notas de Preparación</Text>
+          <Text style={styles.descripcionTexto}>{pedidoActual.descripcion}</Text>
+        </View>
+      ) : null}
 
       {/* Información Financiera */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Información Financiera</Text>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Precio Total:</Text>
+          <Text style={styles.detailLabel}>Subtotal Productos:</Text>
+          <Text style={styles.detailValue}>
+            {formatCurrency(pedidoActual.precio_total - (pedidoActual.precio_domicilio || 0))}
+          </Text>
+        </View>
+
+        {pedidoActual.es_domicilio && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Costo Domicilio:</Text>
+            <Text style={styles.detailValue}>
+              {formatCurrency(pedidoActual.precio_domicilio || 0)}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Total a Pagar:</Text>
           <Text style={[styles.detailValue, styles.priceTotal]}>
             {formatCurrency(pedidoActual.precio_total)}
           </Text>
@@ -498,7 +684,7 @@ const PedidoDetalleScreen: React.FC = () => {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Total Abonado:</Text>
           <Text style={[styles.detailValue, styles.totalAbonado]}>
-            {formatCurrency(pedidoActual.total_abonado)}
+            {formatCurrency(totalAbonadoCalculado)}
           </Text>
         </View>
 
@@ -506,9 +692,9 @@ const PedidoDetalleScreen: React.FC = () => {
           <Text style={styles.detailLabel}>Saldo Pendiente:</Text>
           <Text style={[
             styles.detailValue,
-            pedidoActual.saldo_pendiente > 0 ? styles.saldoPendiente : styles.saldoCero
+            saldoPendienteCalculado > 0 ? styles.saldoPendiente : styles.saldoCero
           ]}>
-            {formatCurrency(pedidoActual.saldo_pendiente)}
+            {formatCurrency(saldoPendienteCalculado)}
           </Text>
         </View>
       </View>
@@ -517,7 +703,7 @@ const PedidoDetalleScreen: React.FC = () => {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Abonos</Text>
-          {pedidoActual.estado !== 'cancelado' && pedidoActual.saldo_pendiente > 0 && (
+          {pedidoActual.estado !== 'cancelado' && !esPedidoPagado && (
             <TouchableOpacity
               style={styles.addAbonoButton}
               onPress={() => setShowAbonoModal(true)}
@@ -551,7 +737,7 @@ const PedidoDetalleScreen: React.FC = () => {
       {/* Acciones */}
       <View style={styles.actionsContainer}>
         {/* Botones para pedidos pendientes */}
-        {pedidoActual.estado === 'pendiente' && (
+        {estadoPedidoLocal === 'pendiente' && (
           <>
             {/* Fila 1: Editar y Eliminar */}
             <View style={styles.actionRow}>
@@ -583,13 +769,13 @@ const PedidoDetalleScreen: React.FC = () => {
                   styles.actionButton,
                   styles.entregarButton,
                   styles.actionButtonFull,
-                  pedidoActual.saldo_pendiente > 0 && styles.buttonDisabled
+                  !esPedidoPagado && styles.buttonDisabled
                 ]}
                 onPress={() => handleConfirmarEstado('entregado')}
-                disabled={pedidoActual.saldo_pendiente > 0}
+                disabled={!esPedidoPagado}
               >
                 <Text style={styles.actionButtonText}>
-                  {pedidoActual.saldo_pendiente > 0 ? '🔒 Saldo Pendiente' : '✅ Entregar'}
+                  {!esPedidoPagado ? '🔒 Saldo Pendiente' : '✅ Entregar'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -597,7 +783,7 @@ const PedidoDetalleScreen: React.FC = () => {
         )}
 
         {/* Botón para pedidos cancelados */}
-        {pedidoActual.estado === 'cancelado' && (
+        {estadoPedidoLocal === 'cancelado' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.reactivarButton]}
             onPress={() => handleConfirmarEstado('pendiente')}
@@ -607,7 +793,7 @@ const PedidoDetalleScreen: React.FC = () => {
         )}
 
         {/* Botón para pedidos entregados */}
-        {pedidoActual.estado === 'entregado' && (
+        {estadoPedidoLocal === 'entregado' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.reactivarButton]}
             onPress={() => handleConfirmarEstado('pendiente')}
@@ -620,14 +806,70 @@ const PedidoDetalleScreen: React.FC = () => {
       {renderConfirmModal()}
       {renderAbonoModal()}
       {renderDeleteModal()}
+
+      {/* Selector de Insumos Dinámico */}
+      <Modal
+        visible={showInsumoSelectorModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInsumoSelectorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.selectorModalContent}>
+            <Text style={styles.modalTitle}>Seleccionar Insumo</Text>
+            <ScrollView style={styles.selectorList}>
+              {insumos.flatMap(ins => 
+                (ins.insumo_tamanos || []).map(it => ({
+                  id: it.id,
+                  insumo_id: ins.id,
+                  insumoNombre: ins.nombre,
+                  tamanoNombre: it.tamano?.nombre,
+                  stockActual: it.cantidad
+                }))
+              ).map((opt) => (
+                <TouchableOpacity 
+                  key={opt.id} 
+                  style={styles.selectorItem}
+                  onPress={() => activeItemForInsumo && handleAddInsumoManual(activeItemForInsumo, opt)}
+                >
+                  <View>
+                    <Text style={styles.selectorItemName}>{opt.insumoNombre}</Text>
+                    <Text style={styles.selectorItemSize}>{opt.tamanoNombre}</Text>
+                  </View>
+                  <Text style={[
+                    styles.selectorItemStock,
+                    opt.stockActual <= 0 && { color: COLORS.error }
+                  ]}>
+                    Stock: {opt.stockActual}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity 
+              style={styles.closeSelectorBtn}
+              onPress={() => setShowInsumoSelectorModal(false)}
+            >
+              <Text style={styles.closeSelectorText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  contentContainer: {
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -671,6 +913,25 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     marginBottom: SPACING.xs,
   },
+  headerDescription: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  headerDescriptionLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  headerDescriptionText: {
+    fontSize: FONTS.medium,
+    color: COLORS.text,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
   clienteDireccion: {
     fontSize: FONTS.small,
     color: COLORS.textMuted,
@@ -708,6 +969,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
     marginBottom: SPACING.md,
+  },
+  descripcionTexto: {
+    fontSize: FONTS.medium,
+    color: COLORS.text,
+    lineHeight: 22,
+    fontStyle: 'italic',
+    backgroundColor: '#F9FAFB',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   detailRow: {
     flexDirection: 'row',
@@ -821,8 +1093,147 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   buttonDisabled: {
-    backgroundColor: COLORS.textMuted,
+    backgroundColor: COLORS.border,
     opacity: 0.6,
+  },
+  // Nuevos estilos para inventario dinámico
+  inventoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  addInsumoBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  addInsumoBadgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  inventorySelectedList: {
+    gap: SPACING.xs,
+  },
+  inventorySelectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  inventorySelectInfo: {
+    flex: 1,
+  },
+  inventorySelectName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  inventorySelectSize: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  inventoryQtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginHorizontal: SPACING.sm,
+  },
+  qtyBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  qtyText: {
+    paddingHorizontal: 8,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    minWidth: 25,
+    textAlign: 'center',
+  },
+  removeInsumoBtn: {
+    padding: 4,
+  },
+  removeInsumoIcon: {
+    fontSize: 16,
+    color: COLORS.error,
+  },
+  selectorModalContent: {
+    backgroundColor: COLORS.surface,
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    ...SHADOWS.large,
+  },
+  selectorList: {
+    marginVertical: SPACING.md,
+  },
+  selectorItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  selectorItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  selectorItemSize: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+  },
+  selectorItemStock: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.success,
+  },
+  closeSelectorBtn: {
+    backgroundColor: COLORS.border,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+    marginTop: SPACING.sm,
+  },
+  closeSelectorText: {
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
+  lockedBadge: {
+    backgroundColor: COLORS.surface,
+    padding: 8,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+  },
+  lockedBadgeText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  noInsumosText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: SPACING.md,
   },
   actionButtonText: {
     fontSize: FONTS.medium,

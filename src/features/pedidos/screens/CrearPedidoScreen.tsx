@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -210,14 +211,17 @@ const CrearPedidoScreen: React.FC = () => {
 
   if (isLoadingMetadata) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Cargando...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <Text>Cargando...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.formContainer}>
           <Text style={styles.title}>Nuevo Pedido</Text>
@@ -284,14 +288,18 @@ const CrearPedidoScreen: React.FC = () => {
           minimumDate={new Date()}
         />
       )}
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  container: {
+    flex: 1,
   },
   formContainer: {
     padding: SPACING.lg,

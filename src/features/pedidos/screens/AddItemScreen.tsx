@@ -195,30 +195,34 @@ const AddItemScreen: React.FC = () => {
 
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
-                <Text>Cargando metadatos...</Text>
-            </View>
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.loadingContainer}>
+                    <Text>Cargando metadatos...</Text>
+                </View>
+            </SafeAreaView>
         );
     }
 
     // Verificar si hay productos disponibles
     if (!isLoading && (!productos || productos.length === 0)) {
         return (
-            <View style={styles.loadingContainer}>
-                <Text style={styles.errorText}>⚠️ No hay productos disponibles</Text>
-                <Text style={styles.errorSubtext}>
-                    No se encontraron productos en la base de datos.
-                </Text>
-                <Text style={styles.errorSubtext}>
-                    Por favor, agrega productos desde la configuración primero.
-                </Text>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Text style={styles.backButtonText}>Volver</Text>
-                </TouchableOpacity>
-            </View>
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.errorText}>⚠️ No hay productos disponibles</Text>
+                    <Text style={styles.errorSubtext}>
+                        No se encontraron productos en la base de datos.
+                    </Text>
+                    <Text style={styles.errorSubtext}>
+                        Por favor, agrega productos desde la configuración primero.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Text style={styles.backButtonText}>Volver</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
         );
     }
 

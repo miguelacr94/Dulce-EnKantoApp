@@ -86,12 +86,12 @@ const MainTabs = () => {
         },
         tabBarStyle: {
           backgroundColor: COLORS.surface,
-          height: 60 + insets.bottom,
-          paddingTop: 10,
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          height: 75 + insets.bottom,
+          paddingTop: 12,
+          paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 20,
           borderTopWidth: 1,
           borderTopColor: COLORS.border,
-          ...SHADOWS.soft,
+          ...SHADOWS.medium,
         },
         headerStyle: {
           backgroundColor: COLORS.primary, // Header Rosa
